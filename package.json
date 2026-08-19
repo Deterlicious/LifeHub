@@ -1,0 +1,26 @@
+{
+  "name": "lifehub",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.22.0",
+  "engines": {
+    "node": "^22.13.0 || ^24.0.0",
+    "pnpm": ">=11.22.0 <12"
+  },
+  "scripts": {
+    "dev:web": "pnpm --dir apps/web dev",
+    "dev:api": "go -C services/api run ./cmd/api",
+    "migrate:api": "go -C services/api run ./cmd/migrate",
+    "typecheck": "pnpm --dir apps/web typecheck",
+    "lint": "pnpm --dir apps/web lint",
+    "test": "pnpm --dir apps/web test",
+    "build": "pnpm --dir apps/web build",
+    "test:e2e": "pnpm --dir apps/web test:e2e",
+    "test:go": "go -C services/api test ./...",
+    "test:go:integration": "go -C services/api test -tags=integration -count=1 ./...",
+    "vet:go": "go -C services/api vet ./...",
+    "vuln:go": "go -C services/api tool govulncheck ./...",
+    "check:web": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
+    "check:go": "pnpm test:go && pnpm vet:go && pnpm vuln:go"
+  }
+}

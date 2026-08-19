@@ -1,0 +1,40 @@
+# LifeHub project instructions
+
+- Product copy is Indonesian; code, API fields, DB names, and technical documentation use English.
+- LifeHub is a daily-use personal life command center, not a generic admin dashboard.
+- Keep **Today** as the primary product experience.
+- Go owns domain validation, authorization, Today aggregation, recurrence, reminders, durable jobs, and private persistence.
+- PostgreSQL is the source of truth. Never use in-memory timers as the sole reminder source.
+- Store moments as `timestamptz`; store user timezone as IANA; use date semantics for document expiry.
+- Money uses integer minor units. For IDR, integer rupiah only; never float.
+- Never trust browser `user_id`; derive identity from a cryptographically verified token.
+- Preferred auth: Supabase Auth + JWKS verification in Go unless existing repo already has a sound alternative.
+- Private domain writes go through Go; browser must not use DB service credentials.
+- Smart/AI Quick Add only creates an editable draft; it never mutates production data.
+- Manual structured creation must work without AI credentials.
+- Stable dependencies only; no beta/canary/RC unless explicitly approved and documented.
+- Use `pnpm` for web and Go modules for backend.
+- Prefer `net/http` + chi, pgx, sqlc, Goose, River, and PostgreSQL.
+- Do not add Redis, Kafka, GraphQL, Kubernetes, or microservices without a demonstrated requirement.
+- Important background work must be durable and idempotent; no fire-and-forget goroutines.
+- Every private query/update/delete enforces ownership server-side.
+- Do not log tokens, task notes, sensitive document details, or private AI payloads.
+- Preserve the **Calm Command Center** design direction and avoid default-AI dashboard patterns.
+- Target WCAG 2.2 AA and mobile-first behavior around 390×844.
+- Before major work read `coldstart.md` and update `docs/implementation-plan.md`.
+- Record final dependency decisions in `docs/stack-versions.md`.
+- Keep architecture/security/AI docs aligned with reality.
+- Never commit secrets; `.env.example` contains placeholders only.
+- If credentials are unavailable, finish interfaces, mocks/fallbacks, tests, docs, and manual flow.
+- Before handoff run, where applicable:
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm test`
+  - `pnpm build`
+  - `pnpm test:e2e`
+  - `go test ./...`
+  - `go test -race ./...`
+  - `go vet ./...`
+  - `govulncheck ./...`
+- Do not claim completion if checks were not run. Report failures and causes.
+- Avoid destructive Git/database commands unless explicitly requested.

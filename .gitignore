@@ -1,0 +1,25 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# JavaScript
+node_modules/
+.next/
+out/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+
+# Go
+bin/
+*.test
+coverage.out
+
+# Local tooling
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+tmp/

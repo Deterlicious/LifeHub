@@ -1,0 +1,126 @@
+package config
+
+import (
+	"fmt"
+	"net"
+	"net/url"
+	"os"
+	"strings"
+)
+
+type Config struct {
+	AppEnv           string
+	HTTPAddr         string
+	DatabaseURL      string
+	WebOrigins       []string
+	SupabaseJWKSURL  string
+	SupabaseIssuer   string
+	SupabaseAudience string
+	DevAuthSecret    string
+}
+
+func (c Config) Production() bool {
+	return c.AppEnv == "production"
+}
+
+func Load() (Config, error) {
+	config := Config{
+		AppEnv:           envOrDefault("APP_ENV", "development"),
+		HTTPAddr:         envOrDefault("HTTP_ADDR", "127.0.0.1:8080"),
+		DatabaseURL:      strings.TrimSpace(os.Getenv("DATABASE_URL")),
+		WebOrigins:       splitOrigins(envOrDefault("WEB_ORIGIN", "http://localhost:3000")),
+		SupabaseJWKSURL:  strings.TrimSpace(os.Getenv("SUPABASE_JWKS_URL")),
+		SupabaseIssuer:   strings.TrimSpace(os.Getenv("SUPABASE_ISSUER")),
+		SupabaseAudience: envOrDefault("SUPABASE_AUDIENCE", "authenticated"),
+		DevAuthSecret:    strings.TrimSpace(os.Getenv("DEV_AUTH_SECRET")),
+	}
+	if config.AppEnv != "development" && config.AppEnv != "test" && config.AppEnv != "production" {
+		return Config{}, fmt.Errorf("APP_ENV must be development, test, or production")
+	}
+	if config.DatabaseURL == "" {
+		return Config{}, fmt.Errorf("DATABASE_URL is required")
+	}
+	if len(config.WebOrigins) == 0 {
+		return Config{}, fmt.Errorf("WEB_ORIGIN must contain at least one origin")
+	}
+	for _, origin := range config.WebOrigins {
+		if err := validateOrigin(origin, config.Production()); err != nil {
+			return Config{}, fmt.Errorf("WEB_ORIGIN: %w", err)
+		}
+	}
+	if config.Production() {
+		if err := validateHTTPSURL("SUPABASE_JWKS_URL", config.SupabaseJWKSURL); err != nil {
+			return Config{}, err
+		}
+		if err := validateHTTPSURL("SUPABASE_ISSUER", config.SupabaseIssuer); err != nil {
+			return Config{}, err
+		}
+		config.DevAuthSecret = ""
+	} else {
+		if err := validateLoopbackAddress(config.HTTPAddr); err != nil {
+			return Config{}, fmt.Errorf("HTTP_ADDR: %w", err)
+		}
+		if len(config.DevAuthSecret) < 32 {
+			return Config{}, fmt.Errorf("DEV_AUTH_SECRET must be at least 32 bytes")
+		}
+	}
+	return config, nil
+}
+
+func validateLoopbackAddress(value string) error {
+	host, _, err := net.SplitHostPort(value)
+	if err != nil {
+		return fmt.Errorf("must be a host:port address")
+	}
+	if strings.EqualFold(host, "localhost") {
+		return nil
+	}
+	ip := net.ParseIP(host)
+	if ip == nil || !ip.IsLoopback() {
+		return fmt.Errorf("must bind to a loopback address outside production")
+	}
+	return nil
+}
+
+func validateHTTPSURL(name, value string) error {
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil {
+		return fmt.Errorf("%s must be an absolute https URL", name)
+	}
+	return nil
+}
+
+func validateOrigin(value string, requireHTTPS bool) error {
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return fmt.Errorf("%q is not a valid origin", value)
+	}
+	if parsed.Path != "" {
+		return fmt.Errorf("%q must not contain a path", value)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf("%q must use http or https", value)
+	}
+	if requireHTTPS && parsed.Scheme != "https" {
+		return fmt.Errorf("%q must use https in production", value)
+	}
+	return nil
+}
+
+func splitOrigins(value string) []string {
+	var origins []string
+	for _, origin := range strings.Split(value, ",") {
+		origin = strings.TrimSpace(origin)
+		if origin != "" {
+			origins = append(origins, strings.TrimSuffix(origin, "/"))
+		}
+	}
+	return origins
+}
+
+func envOrDefault(name, fallback string) string {
+	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
+		return value
+	}
+	return fallback
+}
