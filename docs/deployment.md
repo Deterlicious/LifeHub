@@ -181,7 +181,7 @@ On 27 August 2026, both production images built and ran locally:
 - the standalone web container returned HTTP 200 with its production CSP/HSTS headers;
 - the full product journeys had already exercised durable reminder retry/restart idempotency, recurrence, and reviewed Smart Capture against PostgreSQL.
 
-CI now repeats both production image builds after the web and Go gates, using non-secret public placeholders for the Supabase/web build boundary. The workflow itself passes `actionlint` 1.7.12 locally; GitHub-hosted execution is not claimed until the commit is pushed.
+CI now repeats both production image builds after the web and Go gates, using non-secret public placeholders for the Supabase/web build boundary. The workflow passes `actionlint` 1.7.12 locally, and GitHub Actions run `33265715718` passed the web, Go, container-build, and eight-case E2E jobs for commit `542ef4c`.
 
 This is local container evidence only. The fresh eight-case browser suite and clean-database application/River migration proof now pass against PostgreSQL 18.6. The final release still requires a rebuild after the 18.6 image pin, hosted Supabase journey, real ingress/header checks, and a live worker delivery smoke.
 

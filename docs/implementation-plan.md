@@ -397,7 +397,7 @@ Completed locally:
 - non-root API/worker/migrator and standalone web production images build and smoke successfully;
 - a paid Render Singapore Blueprint defines API, worker, web, and private PostgreSQL 18 without embedding secrets;
 - the Blueprint uses current plan identifiers, `checksPass` deployment triggers, and passes Render's current published JSON Schema; the official CLI's workspace-backed validation remains a provisioning check;
-- immutable-action CI passes `actionlint` locally and now builds both production images after web/Go quality gates;
+- immutable-action CI passes `actionlint` locally, and GitHub Actions run `33265715718` passed web/Go quality gates, both production image builds, and the persisted eight-case E2E suite;
 - production startup validates HTTPS configuration, ignores development auth, supports platform `PORT`, and emits security headers;
 - `/readyz` verifies PostgreSQL plus exact application/River migration versions;
 - API/worker graceful shutdown and migrator no-op behavior were smoke-tested;
@@ -409,7 +409,7 @@ Completed locally:
 
 Release gates still open on 30 August 2026:
 
-- repeat final API/worker/migrator and standalone web image builds after the PostgreSQL 18.6 pin (Docker Desktop is unavailable on this host; the checked-in CI `containers` job will perform that gate after push);
+- repeat final API/worker/migrator and standalone web image builds on the local Docker host after the PostgreSQL 18.6 pin (Docker Desktop is unavailable on this host; GitHub Actions run `33265715718` completed the checked-in `containers` gate successfully);
 - complete manual 360px/200%-zoom/accessibility verification;
 - define and test production backup/restore plus any required Supabase identity-deletion procedure;
 - obtain explicit approval for the paid Render plans and hosted Supabase/public-origin values;

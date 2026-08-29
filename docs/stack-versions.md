@@ -34,7 +34,7 @@ The local workflow added on 20 August 2026 pins each third-party action to the i
 | `actions/setup-go` | v7.0.0 | `b7ad1dad31e06c5925ef5d2fc7ad053ef454303e` |
 | `actions/upload-artifact` | v7.0.1 | `043fb46d1a93c77aae656e7c1c64a875d1fc6a0a` |
 
-`pnpm/setup` is the stable pnpm-maintained action for pnpm 11+ self-contained binaries and installs the selected Node 24.19.0 runtime without a second Node setup action. The workflow has passed `actionlint` 1.7.12 locally; it is not claimed as a successful GitHub-hosted run until pushed.
+`pnpm/setup` is the stable pnpm-maintained action for pnpm 11+ self-contained binaries and installs the selected Node 24.19.0 runtime without a second Node setup action. The workflow passes `actionlint` 1.7.12 locally; GitHub Actions run `33265715718` also passed after the boolean pnpm-store cache input and migration bootstrap were corrected.
 
 ## Frontend selection
 
