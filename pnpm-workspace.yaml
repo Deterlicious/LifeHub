@@ -11,5 +11,5 @@ minimumReleaseAgeExclude:
   - '@vitest/snapshot@4.1.11'
   - '@vitest/spy@4.1.11'
   - '@vitest/utils@4.1.11'
-  - lucide-react@1.32.0
+  - lucide-react@1.32.0 || 1.37.0
   - vitest@4.1.11

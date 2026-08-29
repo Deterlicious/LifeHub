@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"lifehub/services/api/internal/migrate"
+	"lifehub/services/api/internal/riverinfra"
 )
 
 func main() {
@@ -21,5 +22,9 @@ func main() {
 		slog.Error("migration failed", "error", err)
 		os.Exit(1)
 	}
-	slog.Info("migrations applied")
+	if err := riverinfra.Migrate(ctx, databaseURL); err != nil {
+		slog.Error("River migration failed", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("migrations applied", "river_target_version", riverinfra.TargetVersion)
 }

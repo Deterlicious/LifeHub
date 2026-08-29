@@ -1,0 +1,150 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Web quality and supply chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install pnpm and Node.js
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2.0.2
+        with:
+          runtime: node@24.19.0
+          cache: pnpm
+          install: false
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck, lint, test, and build
+        run: pnpm check:web
+      - name: Audit high-severity advisories
+        run: pnpm audit --audit-level high
+      - name: Verify registry signatures
+        run: pnpm audit signatures
+
+  go:
+    name: Go quality, integration, and race
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GOTOOLCHAIN: auto
+      TEST_DATABASE_URL: postgres://lifehub:lifehub@127.0.0.1:5432/lifehub?sslmode=disable
+    services:
+      postgres:
+        image: postgres:18.6-alpine
+        env:
+          POSTGRES_DB: lifehub
+          POSTGRES_USER: lifehub
+          POSTGRES_PASSWORD: lifehub
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lifehub -d lifehub"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: services/api/go.mod
+          cache-dependency-path: services/api/go.sum
+      - name: Run unit and HTTP tests
+        run: go -C services/api test ./...
+      - name: Run PostgreSQL integration tests
+        run: go -C services/api test -tags=integration -count=1 ./...
+      - name: Run race detector with PostgreSQL integration tests
+        run: go -C services/api test -tags=integration -race -count=1 ./...
+      - name: Run vet
+        run: go -C services/api vet ./...
+      - name: Scan Go vulnerabilities
+        run: go -C services/api tool govulncheck ./...
+
+  containers:
+    name: Production container builds
+    needs: [web, go]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build API, worker, and migrator image
+        run: docker build --file services/api/Dockerfile --tag lifehub-api:ci services/api
+      - name: Build standalone web image
+        run: >-
+          docker build
+          --file apps/web/Dockerfile
+          --build-arg NEXT_PUBLIC_API_URL=https://api.example.test/api/v1
+          --build-arg NEXT_PUBLIC_AUTH_MODE=supabase
+          --build-arg NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co
+          --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_ci_placeholder
+          --tag lifehub-web:ci
+          .
+
+  e2e:
+    name: Persisted browser journeys
+    needs: [web, go]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GOTOOLCHAIN: auto
+      LIFEHUB_E2E_DATABASE_URL: postgres://lifehub:lifehub@127.0.0.1:55432/lifehub?sslmode=disable
+    services:
+      postgres:
+        image: postgres:18.6-alpine
+        env:
+          POSTGRES_DB: lifehub
+          POSTGRES_USER: lifehub
+          POSTGRES_PASSWORD: lifehub
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U lifehub -d lifehub"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install pnpm and Node.js
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2.0.2
+        with:
+          runtime: node@24.19.0
+          cache: pnpm
+          install: false
+      - name: Install Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: services/api/go.mod
+          cache-dependency-path: services/api/go.sum
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm --dir apps/web exec playwright install --with-deps chromium
+      - name: Run persisted browser journeys
+        run: pnpm test:e2e
+      - name: Upload Playwright diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-diagnostics
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          if-no-files-found: ignore
+          retention-days: 7

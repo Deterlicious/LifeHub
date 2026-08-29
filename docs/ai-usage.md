@@ -2,6 +2,8 @@
 
 AI is optional. LifeHub must remain useful without an AI key.
 
+Status: **draft-only Smart Capture is implemented locally with deterministic rule and mock providers. No remote AI provider, paid credential, or autonomous write path is installed.**
+
 ## Purpose
 
 Smart Capture shortens entry.
@@ -68,9 +70,9 @@ type Provider interface {
 ```
 
 Implementations:
-1. RuleProvider
-2. MockProvider
-3. optional remote provider
+1. `RuleProvider` — active deterministic default;
+2. `MockProvider` — active only when explicitly configured outside production, for deterministic tests;
+3. optional remote provider — not implemented.
 
 ## Rule provider
 
@@ -87,6 +89,24 @@ Support common Indonesian patterns where practical:
 When uncertain, leave fields unresolved and ask for review.
 
 Do not build a huge NLP engine.
+
+The current rule provider covers task/event/bill/document drafts, `besok`, `lusa`, explicit dates and wall-clock times, common IDR shorthand, priority, and simple daily/weekly/monthly/yearly recurrence. It reports unresolved or conflicting details as ambiguities instead of manufacturing certainty.
+
+## Implemented API boundary
+
+`POST /api/v1/smart-capture/parse`:
+
+- requires a cryptographically verified user and completed timezone profile;
+- accepts one non-empty `input` string of at most 1,000 characters;
+- applies a two-second provider timeout;
+- limits each authenticated user to 20 requests per rolling minute and returns standard rate-limit headers;
+- validates and normalizes provider output before returning it;
+- logs neither raw input nor raw output;
+- cannot invoke a create/update/delete action.
+
+The current bounded rate limiter is process-local. The selected initial deployment uses one API instance; horizontal scaling requires a platform/shared quota before claiming one global per-user rate.
+
+The web places the validated values into the ordinary editable Quick Add form. Ambiguities remain visible and missing required fields block the ordinary Save action. The same manual structured form works when parsing is unavailable.
 
 ## Remote provider
 
@@ -145,3 +165,5 @@ Test:
 - manual fallback.
 
 E2E must not require paid AI credentials.
+
+Implemented automated proof covers task, event, bill, document, Indonesian money, recurrence, ambiguous input, invalid provider output, timeout, unavailable provider, authorization/profile readiness, input limits, rate limits, and no-write-before-confirmation. The dedicated mobile Playwright case uses the deterministic rule provider and proves that parsing alone creates no bill; persistence occurs only after the missing time is supplied and the ordinary Save action is pressed.

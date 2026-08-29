@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const webBaseUrl = process.env.LIFEHUB_E2E_WEB_URL ?? "http://127.0.0.1:3000";
 const apiBaseUrl = process.env.LIFEHUB_E2E_API_URL ?? "http://127.0.0.1:8080/api/v1";
-const apiCommand = process.env.LIFEHUB_E2E_API_COMMAND
-  ?? "docker compose -f ../../compose.yaml up -d --wait postgres && go run ./cmd/migrate && go run ./cmd/api";
+const customApiCommand = process.env.LIFEHUB_E2E_API_COMMAND;
+const apiCommand = customApiCommand ?? "node ./scripts/start-e2e-backend.mjs";
 const e2eEnvironment: Record<string, string> = {
   APP_ENV: "development",
   HTTP_ADDR: "127.0.0.1:8080",
@@ -21,7 +21,7 @@ const e2eEnvironment: Record<string, string> = {
 const webServers = [
   {
     command: apiCommand,
-    cwd: resolve(currentDirectory, "../../services/api"),
+    cwd: customApiCommand ? resolve(currentDirectory, "../../services/api") : currentDirectory,
     url: apiBaseUrl.replace(/\/api\/v1$/, "/healthz"),
     reuseExistingServer: false,
     timeout: 120_000,
@@ -43,6 +43,8 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : "list",
+  // Keep Next dev, the Go API, and the worker responsive on small CI/Windows hosts.
+  workers: 2,
   use: {
     baseURL: webBaseUrl,
     trace: "retain-on-failure",
@@ -53,9 +55,18 @@ export default defineConfig({
   projects: [
     {
       name: "chromium-mobile",
+      grep: /@mobile/,
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 390, height: 844 },
+      },
+    },
+    {
+      name: "chromium-desktop",
+      grep: /@desktop/,
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1280, height: 900 },
       },
     },
   ],

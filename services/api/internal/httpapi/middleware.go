@@ -22,6 +22,24 @@ type requestIDContextKey struct{}
 // of the 5xx error budget; the disconnected client does not receive a body.
 const statusClientClosedRequest = 499
 
+func securityHeaders(production bool) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+			response.Header().Set("Content-Security-Policy", "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+			response.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
+			response.Header().Set("Cross-Origin-Resource-Policy", "same-site")
+			response.Header().Set("Permissions-Policy", "camera=(), geolocation=(), microphone=()")
+			response.Header().Set("Referrer-Policy", "no-referrer")
+			response.Header().Set("X-Content-Type-Options", "nosniff")
+			response.Header().Set("X-Frame-Options", "DENY")
+			if production {
+				response.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+			}
+			next.ServeHTTP(response, request)
+		})
+	}
+}
+
 func (api *API) requestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		requestID := newRequestID()
@@ -46,6 +64,7 @@ func newRequestID() string {
 
 func (api *API) authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		response.Header().Set("Cache-Control", "no-store")
 		values := request.Header.Values("Authorization")
 		if len(values) != 1 {
 			writeError(response, request, http.StatusUnauthorized, "UNAUTHENTICATED", "Sesi tidak valid.", nil)
@@ -94,9 +113,9 @@ func cors(origins []string) func(http.Handler) http.Handler {
 				return
 			}
 			response.Header().Set("Access-Control-Allow-Origin", origin)
-			response.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
+			response.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
 			response.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
-			response.Header().Set("Access-Control-Expose-Headers", "X-Request-ID")
+			response.Header().Set("Access-Control-Expose-Headers", "X-Request-ID, RateLimit-Limit, RateLimit-Remaining, Retry-After")
 			response.Header().Set("Access-Control-Max-Age", "600")
 			if request.Method == http.MethodOptions {
 				response.WriteHeader(http.StatusNoContent)

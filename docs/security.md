@@ -2,6 +2,8 @@
 
 LifeHub may store private personal planning data. Security is a product requirement.
 
+Status note: task/Today, event, bill, document expiry/management, Agenda & Corrections, durable reminders/notifications, recurrence, and draft-only Smart Capture are implemented and locally verified as recorded. Hosted auth, backup/restore operations, and production deployment remain outside the verified scope.
+
 ## Threats
 
 Protect against:
@@ -49,7 +51,29 @@ WHERE id = $1 AND user_id = $2;
 
 Same rule for update/delete.
 
-The first-slice profile, Today, create, and completion paths are subject-scoped. Real-PostgreSQL tests prove that another user cannot see or complete an owned task and receives 404 for cross-owner completion.
+The implemented profile, Today, create, and completion paths are subject-scoped. Real-PostgreSQL tests prove that another user cannot see or complete an owned task and receives 404 for cross-owner completion.
+
+For the implemented event create-to-Today slice:
+
+- `user_id` must never appear in the accepted create body;
+- event inserts derive ownership from the verified token subject;
+- Today event queries bind that same subject;
+- real-PostgreSQL tests prove event persistence and Today isolation between owners;
+- cross-owner event reads or mutations added in later slices must be indistinguishable from missing data.
+
+For the implemented bill create/payment-to-Today slice:
+
+- bill inserts and Today reads derive ownership only from the verified token subject;
+- `mark-paid` binds both bill UUID and subject, returns 404 for cross-owner data, and preserves the first payment timestamp on retries;
+- real-PostgreSQL tests prove bill persistence, ownership isolation, local-day payment boundaries, database constraints, and no truncation.
+
+For the implemented document expiry/management slice:
+
+- create/list/get/update/delete derive ownership only from the verified token subject;
+- every item predicate binds both document UUID and subject; invalid, missing, and cross-owner items are indistinguishable 404 responses;
+- the API accepts metadata only and never accepts a scan, uploaded file, or browser-provided `user_id`;
+- Today/Upcoming and the full manager remain ownership-scoped and uncapped;
+- real-PostgreSQL tests prove CRUD persistence, update/delete isolation, date boundaries, and database constraints.
 
 ## Secrets
 
@@ -71,7 +95,7 @@ Production:
 
 Document based on actual auth transport.
 
-The implemented client persists the development token in `localStorage`; Supabase JS manages the configured production browser session with persistence enabled. API calls send the access token only in `Authorization: Bearer ...`, use `credentials: "omit"`, and do not use ambient authentication cookies. Classic CSRF is therefore not the primary risk for these API mutations. XSS/token theft is the more important browser threat: avoid arbitrary HTML, keep dependencies patched, minimize third-party scripts, and add a tested CSP during deployment hardening. If transport later changes to cookies, re-evaluate secure/httpOnly/sameSite settings and CSRF defenses.
+The implemented client persists the development token in `localStorage`; Supabase JS manages the configured production browser session with persistence enabled. API calls send the access token only in `Authorization: Bearer ...`, use `credentials: "omit"`, and do not use ambient authentication cookies. Classic CSRF is therefore not the primary risk for these API mutations. XSS/token theft is the more important browser threat: avoid arbitrary HTML, keep dependencies patched, and minimize third-party scripts. The web now emits a restrictive CSP plus opener/resource, permissions, referrer, MIME, frame, and production HSTS headers; the API emits an API-appropriate deny-all CSP and equivalent baseline headers. If transport later changes to cookies, re-evaluate secure/httpOnly/sameSite settings and CSRF defenses.
 
 ## XSS
 
@@ -89,6 +113,7 @@ Parameterized queries only. Prefer sqlc/pgx.
 Never log:
 - tokens;
 - task notes;
+- event notes or locations;
 - sensitive document details;
 - private raw AI payloads.
 
@@ -96,13 +121,17 @@ Log IDs/event types instead.
 
 ## Documents
 
-MVP tracks metadata/expiry only.
+MVP tracks metadata/expiry only. The UI explicitly warns against entering document numbers or uploading scans. The API accepts only name, a bounded category, optional notes, and a date-only expiry. Private document responses use `Cache-Control: no-store`, and the CORS allowlist explicitly handles authenticated `DELETE` preflight without widening allowed origins.
 
 File storage later requires separate design for encryption, access control, malware/type limits, retention, deletion, backups, and recovery.
 
 ## Smart capture
 
-If remote AI is used:
+The implemented deterministic and mock providers receive bounded input plus the authenticated user's timezone and return an untrusted draft. Go validates the output, applies a two-second timeout and a 20-request/minute per-user rate limit, and never grants the provider repository/database access. Parsing has no domain write path; the user must confirm through the ordinary ownership-scoped API. Raw input/provider output is not logged.
+
+The current rate limiter is process-local and memory-bounded, which is sufficient for the single API instance in the selected initial topology. A horizontally scaled API would need an ingress- or shared-store-enforced limit before claiming one global quota.
+
+If a remote AI provider is added:
 - disclose third-party processing;
 - minimize payload;
 - server-side key;
@@ -134,39 +163,48 @@ govulncheck ./...
 go list -m -u all
 ```
 
-Verified on 19 August 2026: the frozen pnpm install passed, `pnpm audit --audit-level high` found no known vulnerabilities, all 502 packages passed registry signature verification, and `go tool govulncheck ./...` reported no vulnerabilities.
+The latest scans on 29 August 2026 reported no Go vulnerabilities and no known high-severity pnpm vulnerabilities after recurrence, Smart Capture, production hardening, Go 1.27.0, and the final stable web dependency update. All 502 resolved npm packages have verified registry signatures; only the documented TypeScript/ESLint/Node-type compatibility pins remain behind their registry latest versions.
 
 ## Current limits
 
 - Hosted Supabase login has not been manually exercised because no project credentials were provided; asymmetric verifier behavior is covered by automated JWKS tests.
+- Event list/get/edit/delete, Agenda, bill list/get/edit/delete/mark-unpaid, document metadata CRUD, reminder CRUD, notification read actions, recurrence series/occurrences, and ordinary writes created from reviewed Smart Capture drafts are implemented with server-side ownership enforcement. Document file storage remains explicitly excluded.
+- Authenticated users can permanently delete all of their LifeHub application data through an exact typed confirmation. The transaction cancels their scheduled River reminder jobs before the profile cascade and cannot accept a browser-supplied owner ID. The Supabase authentication identity remains separate and is clearly disclosed in the UI.
 - Development login is for local use only and is not a production identity provider.
 - Non-production API startup requires a loopback listener, and Docker publishes the known-password development database on `127.0.0.1` only.
-- Account deletion, backup retention, CSP/HSTS at a real ingress, and deployment monitoring remain production-readiness work.
+- Auth-provider identity deletion, backup retention/restore proof, hosted CSP/HSTS confirmation at the real ingress, and deployment monitoring remain production-readiness work.
 
 ## Security headers
 
-Review:
-- CSP;
+Implemented and covered by API tests or production-container smoke checks:
+- CSP with `frame-ancestors 'none'`;
 - Referrer-Policy;
 - X-Content-Type-Options;
+- X-Frame-Options;
 - Permissions-Policy;
-- HSTS in HTTPS production;
-- `frame-ancestors`.
+- Cross-Origin-Opener-Policy and Cross-Origin-Resource-Policy on the web;
+- HSTS in production mode.
+
+The final hosted smoke test must confirm the platform does not remove or weaken these headers and that HTTPS is active before release.
 
 Do not cargo-cult a policy that breaks the app.
 
 ## Data deletion
 
-Before real production use define:
-- account deletion;
-- owned-row deletion;
-- reminder/job cancellation;
-- notification/push-subscription deletion;
-- backup retention limitations.
+Implemented for LifeHub application data:
+- exact typed confirmation in the settings dialog;
+- verified-token ownership only;
+- transactional scheduled-reminder cancellation;
+- profile deletion with database cascades across owned rows and notifications;
+- sign-out plus clear disclosure that the Supabase login identity is separate.
+
+Before real production use, define the Supabase identity-deletion policy and disclose/test managed-backup retention limitations. Push-subscription deletion remains irrelevant until Web Push exists.
 
 ## Acceptance tests
 
 - user A cannot read/update/delete user B data;
+- user A's event cannot appear in user B's Today feed;
+- user A cannot pay or see user B's bill in Today;
 - invalid/missing/expired token rejected;
 - forged subject rejected;
 - client user ID ignored;

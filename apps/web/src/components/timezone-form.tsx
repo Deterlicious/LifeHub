@@ -19,6 +19,7 @@ interface TimezoneFormProps {
   initialTimezone?: string;
   mode: "onboarding" | "dialog";
   onCancel?: () => void;
+  onDeleteData?: (confirmation: string) => Promise<void>;
   onSave: (timezone: string) => Promise<void>;
   onSignOut?: () => void;
 }
@@ -27,12 +28,17 @@ export function TimezoneForm({
   initialTimezone,
   mode,
   onCancel,
+  onDeleteData,
   onSave,
   onSignOut,
 }: TimezoneFormProps) {
   const [timezone, setTimezone] = useState(initialTimezone || getBrowserTimezone());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
   const cancelRef = useRef(onCancel);
@@ -96,6 +102,18 @@ export function TimezoneForm({
     }
   }
 
+  async function handleDeleteData() {
+    if (!onDeleteData || deleteConfirmation !== "HAPUS DATA LIFEHUB") return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await onDeleteData(deleteConfirmation);
+    } catch (reason) {
+      setDeleteError(reason instanceof Error ? reason.message : "Data LifeHub belum dapat dihapus.");
+      setDeleting(false);
+    }
+  }
+
   const content = (
     <div className={mode === "dialog" ? "timezone-card timezone-card-dialog" : "timezone-card"}>
       {mode === "dialog" && onCancel ? (
@@ -144,6 +162,59 @@ export function TimezoneForm({
         </button>
       </form>
 
+      {mode === "dialog" && onDeleteData ? (
+        <section className="settings-danger-zone" aria-labelledby="delete-lifehub-data-title">
+          <div>
+            <p className="eyebrow">Privasi & data</p>
+            <h2 id="delete-lifehub-data-title">Hapus seluruh data LifeHub</h2>
+            <p>
+              Menghapus permanen tugas, jadwal, tagihan, metadata dokumen, pengingat,
+              notifikasi, dan pengaturan LifeHub milikmu. Akun login Supabase tidak ikut dihapus.
+            </p>
+          </div>
+          {!deleteOpen ? (
+            <button className="button button-danger" onClick={() => setDeleteOpen(true)} type="button">
+              Hapus seluruh data
+            </button>
+          ) : (
+            <div className="settings-delete-confirm">
+              {deleteError ? <div className="inline-alert inline-alert-error" role="alert">{deleteError}</div> : null}
+              <label className="field">
+                <span>Ketik <strong>HAPUS DATA LIFEHUB</strong> untuk mengonfirmasi</span>
+                <input
+                  autoComplete="off"
+                  disabled={deleting}
+                  onChange={(event) => setDeleteConfirmation(event.target.value)}
+                  value={deleteConfirmation}
+                />
+              </label>
+              <div className="settings-delete-actions">
+                <button
+                  className="button button-secondary"
+                  disabled={deleting}
+                  onClick={() => {
+                    setDeleteOpen(false);
+                    setDeleteConfirmation("");
+                    setDeleteError(null);
+                  }}
+                  type="button"
+                >
+                  Batal
+                </button>
+                <button
+                  className="button button-danger"
+                  disabled={deleting || deleteConfirmation !== "HAPUS DATA LIFEHUB"}
+                  onClick={() => void handleDeleteData()}
+                  type="button"
+                >
+                  {deleting ? "Menghapus…" : "Hapus permanen"}
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+      ) : null}
+
       {mode === "onboarding" && onSignOut ? (
         <button className="quiet-button onboarding-signout" onClick={onSignOut} type="button">
           <LogOut size={16} aria-hidden="true" /> Keluar dari sesi
@@ -158,7 +229,7 @@ export function TimezoneForm({
         if (event.currentTarget === event.target) onCancel?.();
       }}>
         <section aria-labelledby="timezone-dialog-title" aria-modal="true" ref={dialogRef} role="dialog">
-          <span className="sr-only" id="timezone-dialog-title">Pengaturan zona waktu</span>
+          <span className="sr-only" id="timezone-dialog-title">Pengaturan LifeHub</span>
           {content}
         </section>
       </div>

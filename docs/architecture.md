@@ -1,6 +1,6 @@
 # LifeHub Architecture
 
-Status: first task/Today slice implemented; worker and remaining domains are proposed.
+Status: task/Today, event, bill, document expiry/management, Agenda & Corrections, durable reminders/notifications, recurrence, and draft-only Smart Capture are implemented and locally verified. Hosted auth and deployment remain unverified.
 
 ## Goals
 
@@ -15,7 +15,7 @@ Advanced only where correctness requires it.
 
 ## System
 
-Implemented first-slice topology:
+Implemented topology:
 
 ```text
 Browser / Next.js → Go API → PostgreSQL
@@ -59,7 +59,7 @@ Durable reminder jobs, retry, notification delivery/materialization, reconciliat
 
 API and worker may share one Go image with different commands.
 
-The worker is not implemented in the first slice.
+The worker is now implemented as a separate Go command with bounded concurrency, retry, timeout, reconciliation, and graceful shutdown. API and worker share domain/store code but run as separate processes.
 
 ## Domain packages
 
@@ -97,7 +97,7 @@ The current small query surface uses explicit parameterized pgx SQL. sqlc is def
 
 `Browser → Supabase Auth → token → Go → JWKS verify → subject → owned query`
 
-All authorization happens in Go. Every implemented task query binds the verified subject as `user_id`; cross-owner completion returns the same 404 as a missing task.
+All authorization happens in Go. Every implemented task, event, bill, and document query binds the verified subject as `user_id`; cross-owner task completion, bill payment, and document CRUD return the same 404 as missing data. Inserts derive ownership only from the verified subject, and real-PostgreSQL tests prove Today and document-list isolation between users.
 
 ## Today aggregation
 
@@ -114,11 +114,26 @@ Dedicated Go application service:
 
 Avoid aggressive caching before correctness/measurement.
 
+The implemented aggregator receives tasks, events, bills, and documents as a discriminated feed owned and ordered by Go. Its cross-domain order is:
+
+1. overdue tasks and bills by due time;
+2. expired documents by expiry date;
+3. events happening now;
+4. all-day events;
+5. documents expiring today;
+6. timed tasks/events and bills for today by effective instant;
+7. anytime tasks;
+8. tasks completed and bills paid today by closed time.
+
+Document dates retain calendar semantics. Expired and expires-today documents are primary Today attention; tomorrow through local day 30 inclusive is returned separately as `upcoming`, so future awareness does not inflate primary open/completed counts. The full document manager queries every owned record, preserving reachability beyond that horizon.
+
+After effective-time and task-priority comparisons, stable tie-breaks use kind, creation time, and UUID. Event and bill rows are not task-shaped; events have no completion action, while bills use an explicit idempotent payment action. Timed event selection uses overlap with the user-local Today window; all-day selection uses inclusive local date ranges. Unpaid bills remain visible when overdue and paid bills remain visible only when paid within the local day.
+
 ## Time
 
 DB:
 - `timestamptz` for moments;
-- `date` for date-only expiry;
+- `date` for all-day event ranges and date-only expiry;
 - IANA timezone in profile.
 
 API:
@@ -126,20 +141,27 @@ RFC 3339.
 
 Never strip timezone offsets and silently assume UTC.
 
+### Implemented event time model
+
+The create API accepts a strict union:
+
+- timed events: `all_day=false`, required `starts_local`, optional `ends_local`;
+- all-day events: `all_day=true`, required `starts_on`, optional inclusive `ends_on`.
+
+Go interprets timed wall-clock values in the authenticated profile timezone, rejects DST gaps/folds, and stores the resolved instants in `starts_at`/`ends_at` `timestamptz` columns. All-day values remain `starts_on`/`ends_on` PostgreSQL `date` columns so changing offsets cannot move them to a different calendar date. Database checks enforce exactly one representation and valid end ordering.
+
 ## Recurrence
 
-Use explicit model:
+The implemented model is explicit:
 - frequency;
 - interval;
-- start;
-- optional end;
-- optional weekdays later.
+- an immutable local anchor;
+- optional inclusive end date;
+- optional weekday set for weekly series.
 
-Choose and document occurrence strategy before implementation:
-- lazily generate next occurrence; or
-- materialize a bounded window.
+Go validates daily, weekly, monthly, and yearly rules, then materializes a bounded 90-day occurrence window in PostgreSQL. A durable River job extends every active series twice daily. The anchor is retained so month-end clamping and leap-year handling never cause schedule drift.
 
-Do not store arbitrary unvalidated recurrence JSON just for flexibility.
+Occurrence edits become explicit exceptions; occurrence deletion becomes an exclusion. Series edits regenerate only eligible future work, while stop preserves completed/paid history and cancels future reminders. Rules are represented with typed columns rather than arbitrary unvalidated recurrence JSON.
 
 ## Reminder scheduling
 
@@ -180,15 +202,17 @@ When due/recurrence changes:
 
 ## Persistence
 
-Expected tables:
+Implemented tables:
 - profiles;
 - tasks;
 - events;
 - bills;
-- documents;
-- reminders;
+- documents.
+
+Also implemented:
+- reminder definitions and immutable schedule generations;
 - notifications;
-- River job tables.
+- River job tables pinned at migration target 7.
 
 Possible future:
 - push_subscriptions;
@@ -260,9 +284,11 @@ Indexes and query design first. Add cache only after measured benefit and clear 
 
 ## Smart capture
 
-Provider is isolated and cannot directly access repositories.
+The provider is isolated and cannot directly access repositories. The default rule provider deterministically parses a bounded set of Indonesian task, event, bill, document, priority, money, and recurrence phrases. A mock provider supports deterministic failure and timeout tests. No remote provider or AI credential is required.
 
 `parse → draft → validate → response → user confirms via normal create API`
+
+The authenticated API accepts at most 1,000 characters, resolves dates in the stored profile timezone, applies a two-second provider timeout and a 20-request/minute per-user rate limit, and validates the provider's output. It never writes domain data. The web copies the result into the existing editable form; only the normal explicit Save action can mutate data.
 
 ## Future mobile
 
@@ -279,3 +305,7 @@ No default requirement for:
 - event sourcing;
 - CQRS;
 - microservices.
+
+## Current slice deferrals
+
+Agenda & Corrections supplies bounded event management, task/bill corrections and inverse actions, paid-history cursor pagination, and one mixed-domain chronological view while Today remains primary. The Documents slice includes metadata management but intentionally excludes file storage. Durable reminders use exact-pinned River v0.44.0 and PostgreSQL for transactionally scheduled jobs and duplicate-safe notifications. Recurrence and draft-only Smart Capture are active. Hosted Supabase validation and public deployment remain explicit later work.

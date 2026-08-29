@@ -13,6 +13,7 @@ import (
 	"lifehub/services/api/internal/auth"
 	"lifehub/services/api/internal/config"
 	"lifehub/services/api/internal/httpapi"
+	"lifehub/services/api/internal/riverinfra"
 	"lifehub/services/api/internal/store"
 )
 
@@ -28,6 +29,13 @@ func main() {
 
 	rootContext, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	validationContext, validationCancel := context.WithTimeout(rootContext, 15*time.Second)
+	if err := riverinfra.Validate(validationContext, settings.DatabaseURL); err != nil {
+		validationCancel()
+		logger.Error("River schema is not at the pinned target; run cmd/migrate first", "error", err)
+		os.Exit(1)
+	}
+	validationCancel()
 
 	storage, err := store.Open(rootContext, settings.DatabaseURL)
 	if err != nil {
@@ -36,7 +44,7 @@ func main() {
 	}
 	defer storage.Close()
 	pingContext, pingCancel := context.WithTimeout(rootContext, 10*time.Second)
-	err = storage.Ping(pingContext)
+	err = storage.Ready(pingContext)
 	pingCancel()
 	if err != nil {
 		logger.Error("database unavailable", "error", err)
@@ -73,7 +81,7 @@ func main() {
 		Addr: settings.HTTPAddr,
 		Handler: httpapi.New(httpapi.Options{
 			Store: storage, Verifier: verifier, DevIssuer: devIssuer,
-			WebOrigins: settings.WebOrigins, Logger: logger,
+			WebOrigins: settings.WebOrigins, Logger: logger, Production: settings.Production(),
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,

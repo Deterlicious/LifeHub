@@ -2,10 +2,10 @@
   "name": "lifehub",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@11.22.0",
+  "packageManager": "pnpm@11.24.0",
   "engines": {
     "node": "^22.13.0 || ^24.0.0",
-    "pnpm": ">=11.22.0 <12"
+    "pnpm": ">=11.24.0 <12"
   },
   "scripts": {
     "dev:web": "pnpm --dir apps/web dev",

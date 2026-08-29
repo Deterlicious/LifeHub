@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -27,6 +28,34 @@ func decodeJSON(response http.ResponseWriter, request *http.Request, target any)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
 		return err
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return errors.New("request body must contain one JSON object")
+		}
+		return err
+	}
+	return nil
+}
+
+// decodeOptionalEmptyJSON lets action endpoints accept either an empty body or
+// an empty JSON object while retaining the same size, trailing-data, and
+// unknown-field protections as resource mutations.
+func decodeOptionalEmptyJSON(response http.ResponseWriter, request *http.Request) error {
+	request.Body = http.MaxBytesReader(response, request.Body, maxJSONBody)
+	decoder := json.NewDecoder(request.Body)
+	var raw json.RawMessage
+	if err := decoder.Decode(&raw); errors.Is(err, io.EOF) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return errors.New("action body must be an empty JSON object")
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &object); err != nil || object == nil || len(object) != 0 {
+		return errors.New("action body must be an empty JSON object")
 	}
 	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
 		if err == nil {

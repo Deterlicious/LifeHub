@@ -1,8 +1,41 @@
 # LifeHub Deployment Guide
 
-Status: **local first-slice runtime documented; production remains provider-neutral and undeployed**.
+Status: **production images and a Render Blueprint are implemented and smoke-tested locally; no hosted resources have been provisioned and no production deployment is claimed**.
 
-Do not choose hosting based on outdated free-tier assumptions. At deployment time, research current official pricing/runtime limits and update this document with the actual provider and commands.
+Current provider capabilities and stable container bases were rechecked against official documentation/registries on 29 August 2026. Provisioning still requires the owner's account, billing approval, Supabase project values, and final public origins; never create paid resources or claim a deployment before those choices are confirmed.
+
+## Selected production topology — pending provisioning
+
+The current recommended target is:
+
+```text
+Supabase Auth (asymmetric signing key, Singapore)
+        │ Bearer JWT / JWKS
+        ▼
+Render Singapore
+├── Next.js web service
+├── Go API web service
+├── Go River background worker
+└── managed PostgreSQL 18 on the private network
+```
+
+Reasons:
+
+- Render supports native Next.js web services, Go services, continuous background workers, managed PostgreSQL, Blueprint configuration, pre-deploy commands, and a Singapore region;
+- keeping API, worker, and PostgreSQL in one region/private network gives River a direct session-capable database connection without Redis;
+- Supabase's generally available asymmetric signing-key system exposes a rotatable public JWKS, matching the implemented Go verifier without exposing an auth secret to the API;
+- the worker is continuous rather than request-only/serverless, so persisted due jobs can execute after restarts.
+
+Official references:
+
+- [Render Next.js deployment](https://render.com/docs/deploy-nextjs-app)
+- [Render background workers](https://render.com/docs/background-workers)
+- [Render Blueprint reference](https://render.com/docs/blueprint-spec)
+- [Render regions](https://render.com/docs/regions)
+- [Render PostgreSQL](https://render.com/docs/postgresql)
+- [Supabase JWT signing keys](https://supabase.com/docs/guides/auth/signing-keys)
+
+Render does not offer the `free` instance type for background workers, and its recommended pre-deploy command is a paid-service feature. Therefore a trustworthy always-on reminder deployment has a real hosting cost. Exact Render plans and Supabase Free/Pro choice must be approved at provisioning time; free-tier assumptions are not embedded in the code.
 
 ## Deployable units
 
@@ -22,7 +55,11 @@ PostgreSQL
 
 The Go API and worker may use the same container image with different commands.
 
-Only `web`, `api`, and PostgreSQL exist today. The worker is deferred until durable reminders are implemented.
+`web`, `api`, the River worker, the shared application/River migrator, and PostgreSQL exist locally. `apps/web/Dockerfile` and `services/api/Dockerfile` produce non-root production runtimes, and `render.yaml` connects three Singapore services to a private PostgreSQL 18 database. Hosted provisioning and credentials remain deployment work.
+
+The checked-in Blueprint selects current Render `0.5c-512mb` plans for web/API/worker and `0.1c-256mb` PostgreSQL. These are paid resources. Services deploy only after linked GitHub checks pass. Blueprint creation or sync is prohibited until the owner explicitly approves the resulting charges.
+
+On 29 August 2026, `render.yaml` passed the current official `https://render.com/schema/render.yaml.json` JSON Schema. The official Render CLI could not perform its account-backed validation without an authenticated workspace, so that platform check remains part of provisioning rather than being claimed locally.
 
 ## Production requirements
 
@@ -70,6 +107,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 # Go API - server only
 APP_ENV=
 HTTP_ADDR=
+PORT=
 DATABASE_URL=
 WEB_ORIGIN=
 SUPABASE_ISSUER=
@@ -83,37 +121,24 @@ DEV_AUTH_SECRET=
 VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 
-# Optional future AI
-SMART_CAPTURE_PROVIDER=
-SMART_CAPTURE_API_KEY=
 ```
 
 Never put secret values in this document or `.env.example`.
 
 `APP_ENV=production` requires HTTPS for the configured web origin, issuer, and JWKS URL, ignores the development secret, and does not expose the development-session route.
 
-## Container strategy
+## Container strategy — implemented locally
 
-Use multi-stage builds.
-
-Possible Go image:
-
-```text
-builder → compile static/minimal binary
-runtime → non-root user + binary + required CA certificates/tzdata
-```
-
-If the application relies on IANA timezone data, ensure runtime timezone data is available or use an intentional Go tzdata strategy.
+- API/worker/migrator: multi-stage `golang:1.27.0-alpine3.24` build; static CGO-disabled binaries; `alpine:3.24.1` runtime; CA certificates and IANA timezone data; non-root `lifehub` user.
+- Web: multi-stage `node:24.19.0-alpine3.24`; exact pnpm 11.24.0 frozen install; Next standalone output; non-root `lifehub` user.
+- Build contexts use dedicated `.dockerignore` files so secrets, caches, reports, and unrelated development artifacts are not copied.
+- The API honors an explicit `HTTP_ADDR`; when it is absent in production, the platform `PORT` becomes `0.0.0.0:$PORT`. Non-production listeners remain restricted to loopback.
 
 ## Database migrations
 
-Deployment must define who runs migrations.
+The API image includes `/usr/local/bin/migrate`, which applies the embedded seven-version Goose schema and River schema target 7. The Render API uses it as `preDeployCommand`; API startup itself never races to migrate. The same image also includes `/usr/local/bin/worker`.
 
-Preferred options:
-- explicit release/migration job before app rollout; or
-- a controlled deployment step.
-
-Avoid every API replica racing to run migrations on startup unless migration tooling/locking was intentionally designed for it.
+The migrator is safe to rerun when both schemas are current and refuses an unsupported newer River schema. Before production, run its clean-database smoke test and record a tested provider backup/restore procedure.
 
 ## Rollout sequence
 
@@ -141,28 +166,24 @@ GET /readyz
 
 `healthz` checks process health.
 
-`readyz` checks dependencies required to serve traffic, especially PostgreSQL.
+`readyz` checks PostgreSQL connectivity and verifies that both the application and River schemas are at the exact supported versions (7 and 7). A reachable but stale/newer database is not ready.
 
 Do not expose secrets or detailed topology in health responses.
 
-## Current first-slice smoke test
+## Current local smoke proof
 
-1. load public/auth page;
-2. sign in;
-3. create task;
-4. verify Today;
-5. complete task;
-6. refresh/re-login and verify persistence;
-7. check logs for errors without private payload leakage.
+On 27 August 2026, both production images built and ran locally:
 
-## Future worker smoke test
+- the migrator reached application migration 7 and River migration 7, and a second run was a no-op;
+- `/healthz` and `/readyz` returned healthy/ready against PostgreSQL;
+- the API container emitted production security headers and shut down gracefully;
+- the worker connected, started River, and drained cleanly on shutdown;
+- the standalone web container returned HTTP 200 with its production CSP/HSTS headers;
+- the full product journeys had already exercised durable reminder retry/restart idempotency, recurrence, and reviewed Smart Capture against PostgreSQL.
 
-After the reminder slice exists:
+CI now repeats both production image builds after the web and Go gates, using non-secret public placeholders for the Supabase/web build boundary. The workflow itself passes `actionlint` 1.7.12 locally; GitHub-hosted execution is not claimed until the commit is pushed.
 
-1. create a near-future reminder with a controlled test user;
-2. verify one durable job produces one notification;
-3. retry/restart the worker and confirm no duplicate visible notification;
-4. edit/delete the source and confirm stale jobs cannot notify.
+This is local container evidence only. The fresh eight-case browser suite and clean-database application/River migration proof now pass against PostgreSQL 18.6. The final release still requires a rebuild after the 18.6 image pin, hosted Supabase journey, real ingress/header checks, and a live worker delivery smoke.
 
 ## Production checklist
 
@@ -181,7 +202,8 @@ After the reminder slice exists:
 - [ ] dependency audit
 - [ ] `govulncheck ./...`
 - [ ] Playwright critical journey
-- [ ] data deletion procedure
+- [x] LifeHub application-data deletion procedure (typed confirmation, owned cascade, queued reminder cancellation)
+- [ ] Supabase authentication-identity deletion procedure, if required by the production policy
 - [ ] monitoring/alerting proportional to real operational needs
 
 ## Deployment record

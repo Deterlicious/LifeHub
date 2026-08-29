@@ -13,6 +13,13 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "LifeHub · Hal penting hari ini",
   description: "Satu tempat yang tenang untuk tugas dan hal penting hari ini.",
+  applicationName: "LifeHub",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "LifeHub",
+  },
 };
 
 export const viewport: Viewport = {

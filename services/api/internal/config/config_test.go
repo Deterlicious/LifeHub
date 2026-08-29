@@ -39,3 +39,28 @@ func TestDevelopmentAuthRejectsNonLoopbackBinding(t *testing.T) {
 		t.Fatal("development auth accepted a non-loopback listener")
 	}
 }
+
+func TestProductionUsesPlatformPortWhenHTTPAddressIsUnset(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("HTTP_ADDR", "")
+	t.Setenv("PORT", "10000")
+	t.Setenv("DATABASE_URL", "postgres://example")
+	t.Setenv("WEB_ORIGIN", "https://lifehub.example")
+	t.Setenv("SUPABASE_JWKS_URL", "https://example.supabase.co/auth/v1/.well-known/jwks.json")
+	t.Setenv("SUPABASE_ISSUER", "https://example.supabase.co/auth/v1")
+	config, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.HTTPAddr != "0.0.0.0:10000" {
+		t.Fatalf("HTTPAddr=%q", config.HTTPAddr)
+	}
+}
+
+func TestPlatformPortRejectsInvalidValue(t *testing.T) {
+	t.Setenv("HTTP_ADDR", "")
+	t.Setenv("PORT", "70000")
+	if _, err := Load(); err == nil {
+		t.Fatal("invalid platform port accepted")
+	}
+}

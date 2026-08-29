@@ -1,6 +1,6 @@
 # LifeHub — Coldstart / Product Source of Truth
 
-Last planning update: **19 August 2026**
+Last planning update: **29 August 2026**
 
 ## 1. Product
 
@@ -182,6 +182,7 @@ Go owns:
 
 - user timezone is explicit IANA;
 - moments stored as `timestamptz`;
+- all-day event ranges use date semantics with an inclusive end date;
 - document expiry is date-only where appropriate;
 - Today uses user-local boundaries;
 - server timezone must not define user Today.
@@ -235,10 +236,82 @@ All private rows are user-owned and server-authorized.
 
 ## 20. Current status
 
-Planning/bootstrap. Repository implementation is unknown until inspected.
+The repository has been inspected and the task/Today vertical slice is implemented and locally verified:
+
+`development auth → timezone → create task → Today → complete → reload persistence`
+
+The focused **Events → Today** create slice is also implemented and locally verified:
+
+`authenticated user → create timed/all-day event → PostgreSQL → unified Today → reload persistence`
+
+The focused **Bills → Today** create/payment slice is implemented and locally verified:
+
+`authenticated user → create integer bill → unified Today → mark paid → reload persistence`
+
+The focused **Documents → Today and management** slice is also implemented and locally verified:
+
+`authenticated user → create date-only metadata → Today/Upcoming → full manager edit/clear/delete → reload persistence`
+
+Their API, ownership, time/money/date semantics, mixed Today ordering, mobile browser flow, build, database integration, vulnerability, and Linux race checks have run successfully. Agenda & Corrections is also complete locally: the unified Agenda, strict task/event/bill corrections, inverse actions, cursor history, browser navigation, and mobile/desktop persistence journeys are verified. Durable one-off reminders and in-app notifications are complete locally across all four source domains. Daily/weekly/monthly/yearly recurrence is complete locally for tasks, events, and bills, including durable 90-day materialization, exceptions/exclusions, series edit/stop, and calendar-edge coverage. Draft-only Smart Quick Add is also complete locally with deterministic Indonesian parsing, bounded validation, ambiguity review, rate limiting, timeout handling, and explicit-save browser proof.
 
 ## 21. First vertical slice
 
 `Auth → timezone → create task → Today shows task → complete → persistence → tests`
 
-Then Events → Bills → Documents → Reminder Engine.
+This slice is complete for the local development provider. Hosted Supabase sign-in remains unverified because project credentials were not supplied.
+
+## 22. Implemented Events → Today contract
+
+Timed event input uses:
+
+```text
+all_day = false
+starts_local = local wall-clock in the profile timezone
+ends_local = optional local wall-clock in the profile timezone
+```
+
+All-day event input uses:
+
+```text
+all_day = true
+starts_on = YYYY-MM-DD
+ends_on = optional inclusive YYYY-MM-DD
+```
+
+The two shapes are strict alternatives. Go interprets timed values in the authenticated profile's IANA timezone and persists the resulting instants as `timestamptz`. All-day events preserve `date` semantics. Ownership comes only from the verified subject, never browser input.
+
+The implemented unified Today order is:
+
+1. overdue tasks and bills;
+2. expired documents;
+3. events happening now;
+4. all-day events;
+5. documents expiring today;
+6. timed tasks/events and bills for today by effective instant;
+7. anytime tasks;
+8. tasks completed and bills paid today.
+
+Stable tie-breaks use kind, creation time, and UUID after the relevant effective-time/priority comparison.
+
+Agenda & Corrections subsequently implemented bounded event list/get/edit/delete, strict timed/all-day schedule replacement, and the mixed-domain Agenda. The durable reminder phase added moment/date reminders and restart-safe notifications. Recurrence now uses typed rules plus bounded materialization rather than arbitrary recurrence JSON, and Smart Quick Add remains draft-only. Hosted Supabase validation and public deployment remain explicit follow-up work.
+
+## 23. Implemented Bills → Today contract
+
+Bill creation uses a positive integer `amount`, an optional three-letter uppercase `currency` defaulting to `IDR`, and required `due_local`. Go resolves the wall-clock due time in the authenticated profile's stored IANA timezone and persists `due_at` as `timestamptz`. Floating-point and out-of-safe-range amounts are rejected.
+
+`mark-paid` is an explicit, ownership-scoped, idempotent action that preserves the first `paid_at`. Today returns every owned unpaid bill due before the local day ends plus bills paid within that local day; it does not silently cap the feed.
+
+Agenda & Corrections subsequently implemented cursor-paginated bill list/history, get/edit/delete, and idempotent `mark-unpaid` through one chronological experience rather than separate admin dashboards. One-off reminders and recurring bill series are implemented through their dedicated shared engines.
+
+## 24. Implemented Documents → Today and management contract
+
+Document storage is metadata-only: owned name, category, optional notes, and `expires_on date`. The API and UI do not accept scans, uploaded files, or sensitive document numbers.
+
+Go derives status using the authenticated profile's local calendar date:
+
+- before Today: `expired` and included in primary Today;
+- Today: `expiring` and included in primary Today;
+- tomorrow through day 30 inclusive: `expiring` and included only in the separate Upcoming feed;
+- after day 30: `valid` and still reachable through the uncapped owned-document manager.
+
+Create/list/get/PATCH/DELETE are implemented with ownership predicates. PATCH distinguishes omitted fields from `notes: null`; the latter clears notes. The responsive manager supports edit, explicit delete confirmation, reload persistence, and an owned date-based reminder control backed by River.

@@ -6,9 +6,9 @@
 
 This project is deliberately designed as a real daily-use application rather than a portfolio-only CRUD demo. A Next.js frontend provides the product experience, while a Go backend owns domain logic, authorization, time semantics, Today aggregation, recurring schedules, durable reminder jobs, and persistence.
 
-## Implemented vertical slice
+## Implemented vertical slices
 
-The repository now contains one locally verified end-to-end journey:
+The repository now contains eight locally verified product journeys:
 
 ```text
 development sign-in
@@ -17,13 +17,99 @@ development sign-in
   → Go-owned Today aggregation
   → complete the task
   → reload and verify PostgreSQL persistence
+
+authenticated user
+  → create a timed or all-day event
+  → Go validates the user's local-time/date input
+  → PostgreSQL persists the owned event
+  → Go merges it into Today
+  → reload and verify event persistence
+
+authenticated user
+  → create an integer-IDR bill due today
+  → Go merges it into Today
+  → mark it paid idempotently
+  → reload and verify the paid state
+
+authenticated user
+  → create date-only document metadata
+  → Go separates Today attention from the 30-day Upcoming horizon
+  → reach, edit, clear notes, and delete metadata outside that horizon
+  → reload and verify PostgreSQL persistence
+
+authenticated user
+  → browse a profile-local, mixed-domain Agenda
+  → edit or delete owned tasks, events, and bills in one shared sheet
+  → undo task completion or bill payment idempotently
+  → navigate with browser history and reload to verify persistence
+
+authenticated user
+  → configure an owned task/event/bill/document reminder
+  → PostgreSQL and River retain the scheduled job
+  → a restartable Go worker produces exactly one in-app notification
+  → mark it read and reload to verify persisted state
+
+authenticated user
+  → create a daily/weekly/monthly/yearly recurring task, event, or bill
+  → Go materializes a bounded PostgreSQL occurrence window
+  → edit/exclude one occurrence or edit/stop future series work
+  → reload and verify history plus future state remain correct
+
+authenticated user
+  → describe work in Indonesian through Smart Quick Add
+  → receive a validated draft with explicit ambiguities
+  → review/edit the ordinary structured form without any automatic write
+  → save through the normal owned Go API
 ```
 
-The responsive Next.js UI, Go API, two Goose migrations, PostgreSQL 18.4 development service, unit/integration tests, and 390×844 Playwright journey are present. The production Supabase JWKS verifier is automated against an asymmetric test JWKS; hosted Supabase login and any deployment remain unverified because no external credentials were supplied.
+The responsive Next.js UI, Go API, restartable Go worker, seven Goose migrations, River schema pinned at version 7, PostgreSQL 18.6 development service, unit/integration tests, and eight mobile/desktop Playwright cases are present. Agenda and all correction APIs are uncapped or explicitly cursor-paginated, ownership-scoped, and tested across ordinary DST changes, midnight gaps, and skipped civil dates. The production Supabase JWKS verifier is automated against an asymmetric test JWKS; hosted Supabase login and any deployment remain unverified because no external credentials were supplied.
+
+## Events → Today
+
+The focused create-to-Today event slice is implemented and locally verified:
+
+```text
+authenticated user
+  → create a timed or all-day event
+  → Go validates the user's local-time/date input
+  → PostgreSQL persists the owned event
+  → Go merges it into Today
+  → reload preserves the event
+```
+
+The agreed create contract uses `starts_local`/`ends_local` for timed events and `starts_on`/`ends_on` for all-day events. Timed values are interpreted in the authenticated profile's IANA timezone and stored as instants; all-day values retain date semantics, with `ends_on` inclusive. These are strict alternative input shapes, not interchangeable fields.
+
+Agenda & Corrections subsequently added bounded event list/get/edit/delete and strict schedule replacement without turning LifeHub into a generic event admin page. Recurrence and reminders are implemented through the shared series and durable-job engines; hosted Supabase validation and deployment remain follow-up work. No additional event-specific dependency was needed.
+
+## Bills → Today
+
+The focused bill create/payment slice is implemented and locally verified. Go accepts only positive integer JSON amounts up to JavaScript's safe-integer limit, defaults currency to `IDR`, resolves `due_local` in the stored IANA timezone, and stores the instant as `timestamptz`. Today includes every owned unpaid overdue/due-today bill plus bills paid during the local day. `mark-paid` is ownership-scoped and idempotently preserves the first payment time.
+
+The responsive Quick Add and Today row display Indonesian rupiah, overdue/paid state, and a dedicated `Bayar` action. Agenda & Corrections added cursor-paginated bill history, get/edit/delete, and idempotent `mark-unpaid` without adding a separate Bills dashboard. Bills can now use the shared recurrence and durable-reminder engines.
+
+## Documents → Today and management
+
+The metadata-only document slice is implemented and locally verified. Go treats expiry as a profile-local calendar date: expired and expiring-today records appear in primary Today, tomorrow through day 30 inclusive appears in a separate Upcoming section, and later records remain reachable in the full owned-document manager. The UI can create, list, edit, clear notes, and explicitly delete metadata without accepting scans or sensitive document numbers.
+
+Document queries and mutations are ownership-scoped, private responses use `Cache-Control: no-store`, and date/status boundaries are covered by unit, HTTP, real-PostgreSQL, Linux race, and mobile reload-persistence tests. Documents now support date-based reminders through the same durable engine used by the other domains.
+
+## Durable reminders and notifications
+
+Owned one-off reminders are implemented for tasks, timed/all-day events, bills, and documents. Moment reminders use a relative minute offset; date-only reminders use a day offset plus an explicit local wall-clock time. Go validates the schedule against the source shape and authenticated profile timezone, then atomically persists an immutable schedule generation and River job in PostgreSQL.
+
+Source schedule changes, completion/payment state, deletion, and timezone changes cancel or replace stale generations transactionally. The separate bounded worker rehydrates private source data only at delivery time, retries failures, reconciles discarded jobs, and relies on a database uniqueness constraint so retry/restart cannot create duplicate visible notifications. The web notification center supports a persisted unread count, stable cursor pagination, mark-one/all-read, and visible-page polling without Web Push.
+
+## Recurrence
+
+Tasks, timed/all-day events, and bills support validated daily, weekly, monthly, and yearly series with an interval and optional inclusive end. Go materializes a bounded 90-day window and a durable twice-daily River sweep extends active series. The original local anchor prevents month-end, leap-year, and DST drift; individual edits become exceptions, deletion becomes an exclusion, series edits affect eligible future work, and stop preserves completed/paid history while cancelling future work and reminders.
+
+## Smart Quick Add
+
+Smart Quick Add is a draft accelerator, not an autonomous writer. Its authenticated endpoint accepts a maximum of 1,000 characters, uses the stored IANA timezone, enforces a two-second provider timeout and a 20-request/minute per-user limit, validates the returned draft, and performs no domain mutation. The built-in deterministic Indonesian rule provider and mock provider need no AI credentials. The UI fills the existing editable form, surfaces ambiguities, and saves only after the user presses the ordinary Save action.
 
 ## Product scope
 
-The full LifeHub direction includes the domains below. Only the task/Today slice described in the status section is implemented today.
+The full LifeHub direction includes the domains below. The task, event, bill, document expiry/management, Agenda & Corrections, durable reminder, recurrence, and draft-only Smart Quick Add journeys described above are implemented and locally verified. Hosted auth and public deployment are still pending external configuration and final production gates.
 
 ### Today
 One ordered daily feed:
@@ -58,7 +144,7 @@ AI never saves automatically.
 
 ## Architecture
 
-Implemented first slice:
+Implemented slices:
 
 ```text
 Browser → Next.js UI → Go API → PostgreSQL
@@ -105,7 +191,7 @@ Browser → Supabase Auth → JWT → Go verifies JWKS
 - PostgreSQL
 - `log/slog`
 
-Exact installed versions and compatibility pins are in `docs/stack-versions.md`. sqlc, River, shadcn/ui, Motion, Zod, and React Hook Form are deliberately deferred until their corresponding query, reminder, or UI complexity exists.
+Exact installed versions and compatibility pins are in `docs/stack-versions.md`. River is now pinned for the durable reminder worker; sqlc, shadcn/ui, Motion, Zod, and React Hook Form remain deferred until their corresponding query or UI complexity exists.
 
 ## Run locally
 
@@ -153,7 +239,7 @@ Go is not a CRUD wrapper. It owns:
 
 - Absolute moments: PostgreSQL `timestamptz`
 - User timezone: IANA, e.g. `Asia/Jakarta`
-- Date-only expiry: date semantics
+- All-day events and document expiry: date semantics
 - API: RFC 3339 / ISO 8601
 - Today: calculated in user timezone
 
@@ -212,7 +298,7 @@ go -C services/api vet ./...
 go -C services/api tool govulncheck ./...
 ```
 
-Set `TEST_DATABASE_URL` to the local PostgreSQL URL to include the real-database tests. The Windows host has no race-capable C toolchain, so `go test -race` is verified in a Go 1.26.6 Linux container; see `docs/implementation-plan.md` for the recorded result.
+Set `TEST_DATABASE_URL` to the local PostgreSQL URL to include the real-database tests. The Windows host has no race-capable C toolchain, so the final `go test -race` gate runs in a Go 1.27.0 Linux environment (WSL locally or the CI job); see `docs/implementation-plan.md` for the latest recorded result.
 
 To make the database requirement explicit rather than silently skipping repository tests:
 
@@ -223,7 +309,7 @@ pnpm test:go:integration
 
 ## Current E2E
 
-The automated mobile journey signs in with the development issuer, confirms `Asia/Jakarta`, creates and completes a task, expands completed work, reloads, and proves the state persisted. The command reconciles the loopback-only PostgreSQL service, applies migrations, and starts/stops fresh API and web processes through Playwright:
+The eight Playwright cases cover the four-domain first journey, explicit whole-LifeHub-data deletion, mobile/desktop Agenda corrections, mobile/desktop reminder persistence, mobile recurrence, and mobile Smart Quick Add review-before-save. The command expects PostgreSQL on the documented loopback URL, applies both application and River migrations, and starts/stops fresh API, worker where required, and web processes through Playwright:
 
 ```bash
 pnpm test:e2e
@@ -252,6 +338,8 @@ LifeHub may contain private data:
 - keep secrets server-side;
 - TLS in production.
 
+The settings dialog includes an exact typed-confirmation action to remove every LifeHub application row owned by the verified user and cancel queued reminder jobs before signing out. It intentionally does not claim to delete the separate Supabase authentication identity.
+
 ## Documentation
 
 - `coldstart.md` — product source of truth
@@ -265,4 +353,4 @@ LifeHub may contain private data:
 
 ## Status
 
-**First task/Today slice implemented and locally verified.** Events, bills, documents, reminders, recurrence, hosted auth, and deployment remain planned work, not completed features.
+**Task/Today, event, bill, document expiry/management, Agenda & Corrections, durable reminders/notifications, recurrence, and draft-only Smart Quick Add are implemented and locally verified.** Hosted Supabase auth and public deployment are not yet verified; the checked-in production containers and Render Blueprint are preparation, not evidence of a live deployment.

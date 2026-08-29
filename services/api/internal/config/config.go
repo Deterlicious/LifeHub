@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -24,9 +25,13 @@ func (c Config) Production() bool {
 }
 
 func Load() (Config, error) {
+	httpAddr, err := resolveHTTPAddr()
+	if err != nil {
+		return Config{}, err
+	}
 	config := Config{
 		AppEnv:           envOrDefault("APP_ENV", "development"),
-		HTTPAddr:         envOrDefault("HTTP_ADDR", "127.0.0.1:8080"),
+		HTTPAddr:         httpAddr,
 		DatabaseURL:      strings.TrimSpace(os.Getenv("DATABASE_URL")),
 		WebOrigins:       splitOrigins(envOrDefault("WEB_ORIGIN", "http://localhost:3000")),
 		SupabaseJWKSURL:  strings.TrimSpace(os.Getenv("SUPABASE_JWKS_URL")),
@@ -48,6 +53,9 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("WEB_ORIGIN: %w", err)
 		}
 	}
+	if err := validateListenerAddress(config.HTTPAddr); err != nil {
+		return Config{}, fmt.Errorf("HTTP_ADDR: %w", err)
+	}
 	if config.Production() {
 		if err := validateHTTPSURL("SUPABASE_JWKS_URL", config.SupabaseJWKSURL); err != nil {
 			return Config{}, err
@@ -65,6 +73,36 @@ func Load() (Config, error) {
 		}
 	}
 	return config, nil
+}
+
+func resolveHTTPAddr() (string, error) {
+	if value := strings.TrimSpace(os.Getenv("HTTP_ADDR")); value != "" {
+		return value, nil
+	}
+	if port := strings.TrimSpace(os.Getenv("PORT")); port != "" {
+		if _, err := parsePort(port); err != nil {
+			return "", fmt.Errorf("PORT: %w", err)
+		}
+		return net.JoinHostPort("0.0.0.0", port), nil
+	}
+	return "127.0.0.1:8080", nil
+}
+
+func validateListenerAddress(value string) error {
+	_, port, err := net.SplitHostPort(value)
+	if err != nil {
+		return fmt.Errorf("must be a host:port address")
+	}
+	_, err = parsePort(port)
+	return err
+}
+
+func parsePort(value string) (int, error) {
+	port, err := strconv.Atoi(value)
+	if err != nil || port < 1 || port > 65535 {
+		return 0, fmt.Errorf("must be an integer from 1 through 65535")
+	}
+	return port, nil
 }
 
 func validateLoopbackAddress(value string) error {
