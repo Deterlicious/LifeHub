@@ -1,41 +1,50 @@
 # LifeHub Deployment Guide
 
-Status: **production images and a Render Blueprint are implemented and smoke-tested locally; no hosted resources have been provisioned and no production deployment is claimed**.
+Status: **production images, a paid Render Blueprint, and a Google Cloud free-tier deployment profile are implemented; no hosted LifeHub resources have been provisioned and no production deployment is claimed**.
 
-Current provider capabilities and stable container bases were rechecked against official documentation/registries on 29 August 2026. Provisioning still requires the owner's account, billing approval, Supabase project values, and final public origins; never create paid resources or claim a deployment before those choices are confirmed.
+Current provider capabilities, account usage, and stable container bases were rechecked on 1 September 2026. Provisioning still requires a Supabase Free project, the owner's acknowledgement that free tiers are usage limits rather than a hard spending cap, and final public origins. Never claim a deployment before its public journeys pass.
 
-## Selected production topology — pending provisioning
+## Selected Google Cloud free-tier topology — pending provisioning
 
-The current recommended target is:
+The owner selected Google Cloud project `project-592af0e7-ebee-4483-88e`. LifeHub resources use the `lifehub-` prefix and must not modify the existing BagiYuk service or images in that project.
+
+The selected target is:
 
 ```text
-Supabase Auth (asymmetric signing key, Singapore)
-        │ Bearer JWT / JWKS
-        ▼
-Render Singapore
-├── Next.js web service
-├── Go API web service
-├── Go River background worker
-└── managed PostgreSQL 18 on the private network
+Supabase Free Auth + PostgreSQL
+        │ TLS + Bearer JWT/JWKS
+        ├── Cloud Run lifehub-web (min 0, max 1)
+        ├── Cloud Run lifehub-api (min 0, max 1)
+        ├── Cloud Run Job lifehub-reminders (every 15 minutes)
+        └── Cloud Run Job lifehub-maintenance (twice daily)
+                     ▲
+                     └── two Cloud Scheduler triggers
 ```
 
 Reasons:
 
-- Render supports native Next.js web services, Go services, continuous background workers, managed PostgreSQL, Blueprint configuration, pre-deploy commands, and a Singapore region;
-- keeping API, worker, and PostgreSQL in one region/private network gives River a direct session-capable database connection without Redis;
+- Cloud Run services can scale to zero and are capped at one instance for this low-traffic deployment;
+- two bounded Cloud Run Jobs keep the durable River/PostgreSQL design without paying for an always-on worker;
+- two Scheduler jobs fit inside the current three-job billing-account allowance when no unrelated jobs are added;
+- public GHCR images avoid adding LifeHub images to the Google Artifact Registry account usage, which already exceeds its 0.5 GiB free allowance;
 - Supabase's generally available asymmetric signing-key system exposes a rotatable public JWKS, matching the implemented Go verifier without exposing an auth secret to the API;
-- the worker is continuous rather than request-only/serverless, so persisted due jobs can execute after restarts.
+- Supabase Free keeps PostgreSQL as the source of truth; Cloud SQL is excluded because its free use is trial-based rather than a permanent PostgreSQL free tier.
 
 Official references:
 
-- [Render Next.js deployment](https://render.com/docs/deploy-nextjs-app)
-- [Render background workers](https://render.com/docs/background-workers)
-- [Render Blueprint reference](https://render.com/docs/blueprint-spec)
-- [Render regions](https://render.com/docs/regions)
-- [Render PostgreSQL](https://render.com/docs/postgresql)
+- [Cloud Run pricing](https://cloud.google.com/run/pricing)
+- [Cloud Scheduler pricing](https://cloud.google.com/scheduler/pricing)
+- [Artifact Registry pricing](https://cloud.google.com/artifact-registry/pricing)
+- [Secret Manager pricing](https://cloud.google.com/secret-manager/pricing)
+- [GitHub Packages billing](https://docs.github.com/en/billing/concepts/product-billing/github-packages)
+- [Supabase database size](https://supabase.com/docs/guides/platform/database-size)
 - [Supabase JWT signing keys](https://supabase.com/docs/guides/auth/signing-keys)
 
-Render does not offer the `free` instance type for background workers, and its recommended pre-deploy command is a paid-service feature. Therefore a trustworthy always-on reminder deployment has a real hosting cost. Exact Render plans and Supabase Free/Pro choice must be approved at provisioning time; free-tier assumptions are not embedded in the code.
+The reminder job's 15-minute schedule means a due reminder can be delivered roughly 15 minutes late. A 45-second bounded run at that interval plus a twice-daily maintenance run is designed to remain below the current Cloud Run monthly CPU free allowance, but free allowances are shared usage limits and can change. Network egress, database growth, secrets, or unexpected traffic can still create charges. The existing IDR 25,000 budget sends alerts only; it is not a hard cap.
+
+## Existing paid alternative
+
+`render.yaml` remains a valid paid alternative for an always-on worker. Render does not offer a free background-worker instance, and its recommended pre-deploy command is a paid-service feature. Do not create or sync the Blueprint unless the owner explicitly chooses that paid topology.
 
 ## Deployable units
 
@@ -56,6 +65,8 @@ PostgreSQL
 The Go API and worker may use the same container image with different commands.
 
 `web`, `api`, the River worker, the shared application/River migrator, and PostgreSQL exist locally. `apps/web/Dockerfile` and `services/api/Dockerfile` produce non-root production runtimes, and `render.yaml` connects three Singapore services to a private PostgreSQL 18 database. Hosted provisioning and credentials remain deployment work.
+
+`.github/workflows/publish-images.yml` publishes the API/worker/migrator image and, once its public build-time endpoints are known, the web image to GHCR. The image package must be verified as publicly pullable before Cloud Run provisioning. Cloud Run uses the same API image with `/usr/local/bin/api`, `/usr/local/bin/worker`, or `/usr/local/bin/migrate` as the command.
 
 The checked-in Blueprint selects current Render `0.5c-512mb` plans for web/API/worker and `0.1c-256mb` PostgreSQL. These are paid resources. Services deploy only after linked GitHub checks pass. Blueprint creation or sync is prohibited until the owner explicitly approves the resulting charges.
 
@@ -114,6 +125,10 @@ SUPABASE_ISSUER=
 SUPABASE_JWKS_URL=
 SUPABASE_AUDIENCE=authenticated
 
+# Worker only; omit for the normal continuous mode
+WORKER_RUN_DURATION=45s
+WORKER_PERIODIC_JOBS=false
+
 # Local development only; omit in production
 DEV_AUTH_SECRET=
 
@@ -138,20 +153,22 @@ Never put secret values in this document or `.env.example`.
 
 The API image includes `/usr/local/bin/migrate`, which applies the embedded seven-version Goose schema and River schema target 7. The Render API uses it as `preDeployCommand`; API startup itself never races to migrate. The same image also includes `/usr/local/bin/worker`.
 
+For the Google Cloud profile, a one-off `lifehub-migrate` Cloud Run Job must succeed before API traffic is enabled. `lifehub-reminders` runs the worker for 45 seconds with periodic jobs disabled. `lifehub-maintenance` runs the same bounded worker with periodic jobs enabled so River's run-on-start recurrence sweep is inserted durably.
+
 The migrator is safe to rerun when both schemas are current and refuses an unsupported newer River schema. Before production, run its clean-database smoke test and record a tested provider backup/restore procedure.
 
 ## Rollout sequence
 
-Typical safe order:
+Safe Google Cloud order:
 
-1. backup/verify DB recovery capability;
-2. run compatible migrations;
-3. deploy API;
-4. deploy worker;
-5. deploy web;
-6. smoke-test auth and Today;
-7. verify worker health;
-8. verify logs/errors.
+1. create the Supabase Free project and enable asymmetric signing keys;
+2. publish the API image and verify anonymous GHCR pull access;
+3. store the database URL in Secret Manager and create least-privileged service accounts;
+4. run the migration job and verify schema versions 7 and 7;
+5. deploy the API, then publish/deploy the web image using the public API and Supabase values;
+6. deploy bounded reminder and maintenance jobs, then create their Scheduler triggers;
+7. smoke-test hosted authentication, Today, a write/read cycle, and a scheduled reminder;
+8. verify TLS/CORS/security headers, logs, quotas, and budget alerts.
 
 For breaking schema changes, use expand-and-contract migrations.
 
@@ -181,7 +198,7 @@ On 27 August 2026, both production images built and ran locally:
 - the standalone web container returned HTTP 200 with its production CSP/HSTS headers;
 - the full product journeys had already exercised durable reminder retry/restart idempotency, recurrence, and reviewed Smart Capture against PostgreSQL.
 
-CI now repeats both production image builds after the web and Go gates, using non-secret public placeholders for the Supabase/web build boundary. The workflow passes `actionlint` 1.7.12 locally, and GitHub Actions run `33265715718` passed the web, Go, container-build, and eight-case E2E jobs for commit `542ef4c`.
+CI repeats both production image builds after the web and Go gates, using non-secret public placeholders for the Supabase/web build boundary. The separate manual publish workflow emits immutable commit tags plus `latest`; its result is not deployment proof. GitHub Actions run `33265929162` attempt 2 passed the web, Go integration/race, container-build, and eight-case E2E jobs for commit `0c3ecb2` during the Google Cloud verification.
 
 This is local container evidence only. The fresh eight-case browser suite and clean-database application/River migration proof now pass against PostgreSQL 18.6. The final release still requires a rebuild after the 18.6 image pin, hosted Supabase journey, real ingress/header checks, and a live worker delivery smoke.
 

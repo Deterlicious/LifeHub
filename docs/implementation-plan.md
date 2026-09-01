@@ -1,7 +1,7 @@
 # LifeHub Implementation Plan
 
 Status: **MVP domain slices, durable reminders, recurrence, Smart Quick Add, and local release gates are verified; hosted deployment is pending external configuration and approval**
-Last updated: **30 August 2026**
+Last updated: **1 September 2026**
 
 ## Inspected baseline
 
@@ -397,7 +397,7 @@ Completed locally:
 - non-root API/worker/migrator and standalone web production images build and smoke successfully;
 - a paid Render Singapore Blueprint defines API, worker, web, and private PostgreSQL 18 without embedding secrets;
 - the Blueprint uses current plan identifiers, `checksPass` deployment triggers, and passes Render's current published JSON Schema; the official CLI's workspace-backed validation remains a provisioning check;
-- immutable-action CI passes `actionlint` locally, and GitHub Actions run `33265715718` passed web/Go quality gates, both production image builds, and the persisted eight-case E2E suite;
+- immutable-action CI passes `actionlint` locally, and GitHub Actions run `33265929162` attempt 2 passed web/Go quality gates, integration race, both production image builds, and the persisted eight-case E2E suite;
 - production startup validates HTTPS configuration, ignores development auth, supports platform `PORT`, and emits security headers;
 - `/readyz` verifies PostgreSQL plus exact application/River migration versions;
 - API/worker graceful shutdown and migrator no-op behavior were smoke-tested;
@@ -407,13 +407,34 @@ Completed locally:
 - exact-confirmation application-data deletion is implemented through the verified identity, cancels scheduled reminder jobs transactionally, cascades owned PostgreSQL rows, and clearly leaves the separate Supabase identity intact. HTTP/client tests, PostgreSQL integration proof, and the mobile E2E journey all pass.
 - the final lockfile has no known high-severity advisory, all 502 packages have verified registry signatures, the only outdated web packages are three documented compatibility pins, the Go graph resolves no retracted module, and `govulncheck` reports no vulnerability.
 
-Release gates still open on 30 August 2026:
+Release gates still open on 1 September 2026:
 
-- repeat final API/worker/migrator and standalone web image builds on the local Docker host after the PostgreSQL 18.6 pin (Docker Desktop is unavailable on this host; GitHub Actions run `33265715718` completed the checked-in `containers` gate successfully);
+- publish the verified production images and confirm anonymous pull access before Cloud Run uses them;
 - complete manual 360px/200%-zoom/accessibility verification;
 - define and test production backup/restore plus any required Supabase identity-deletion procedure;
-- obtain explicit approval for the paid Render plans and hosted Supabase/public-origin values;
+- create a Supabase Free project and obtain explicit acknowledgement of Google Cloud's usage-based overage risk before provisioning;
 - after provisioning, verify hosted auth/session recovery, TLS/CORS/headers, worker delivery, monitoring, and the critical production journey.
+
+## Google Cloud free-tier deployment track — in progress
+
+The owner selected the existing Google Cloud project `project-592af0e7-ebee-4483-88e` for the hosted deployment. The project has billing enabled, Cloud Run and Cloud Build already enabled, one unrelated BagiYuk Cloud Run service, and an IDR 25,000 monthly budget alert. LifeHub must use isolated resource names and must not modify that existing service.
+
+The closest sustainable free-tier topology keeps the existing security and persistence boundaries:
+
+```text
+Supabase Free Auth + PostgreSQL
+        │
+        ├── Cloud Run lifehub-api (scale to zero)
+        ├── Cloud Run lifehub-web (scale to zero)
+        ├── Cloud Run Job reminder worker (every 15 minutes)
+        └── Cloud Run Job recurrence maintenance (twice daily)
+             ▲
+             └── two Cloud Scheduler jobs
+```
+
+Public images will be published from the public GitHub repository to GHCR so LifeHub does not add to the Google Artifact Registry account usage that already exceeds its 0.5 GiB free allowance. The worker's ordinary continuous behavior remains the default; an explicitly configured bounded batch window will let Cloud Run Jobs stop cleanly. The free deployment trades exact reminder timing for delivery within roughly 15 minutes. Cloud SQL is excluded because it has trial credit rather than a permanent free PostgreSQL tier.
+
+Provisioning remains blocked until a Supabase Free project exists and the owner confirms that Google Cloud free tiers are usage limits rather than a hard spending cap. The existing budget sends alerts but cannot prevent charges by itself.
 
 ## Definition of done
 

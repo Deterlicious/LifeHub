@@ -183,3 +183,16 @@ go tool govulncheck ./...               # no vulnerabilities found
 `go list -mod=mod -m -retracted all` reports no resolved retracted module after the final graph. `go test -tags=integration -race -count=1 ./...` passed in WSL2 Ubuntu with Go 1.27.0, GCC 13.3, and a temporary PostgreSQL 16.15 cluster; CI repeats the same gate in Linux. The Windows host still lacks a race-capable C toolchain, so the race gate intentionally runs in Linux rather than being omitted.
 
 Production images are pinned to stable `golang:1.27.0-alpine3.24`, `node:24.19.0-alpine3.24`, and `alpine:3.24.1` bases. Both images built and smoke-tested locally before the host Docker engine became unavailable; a final rebuild remains part of the release gate.
+
+## Google Cloud deployment tooling — verified 1 September 2026
+
+| Tool/platform | Verified value | Decision |
+| --- | --- | --- |
+| Google Cloud CLI | 579.0.0 | Authenticated locally as `vivoy51577@gmail.com`; used for read-only project and billing inspection before provisioning. |
+| Google Cloud project | `project-592af0e7-ebee-4483-88e` | Owner-selected project; existing BagiYuk resources are out of scope and must remain untouched. |
+| Cloud Run | managed, `asia-southeast1` candidate | Web/API scale to zero; two bounded jobs replace an always-on paid worker in the free-tier profile. |
+| Cloud Scheduler | two jobs planned | Reminder batch every 15 minutes and recurrence maintenance twice daily; within the account's three-job free allowance if no other scheduler jobs exist. |
+| Supabase | Free Nano planned | Auth plus PostgreSQL source of truth; the current free database quota enters read-only mode beyond 500 MB. |
+| GitHub Container Registry | public images planned | Public container storage/bandwidth is currently free and Cloud Run can import public GHCR images directly. |
+
+These are deployment platform decisions, not new application runtime dependencies. No prerelease package is introduced.

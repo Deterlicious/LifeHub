@@ -1,0 +1,96 @@
+name: Publish production images
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_web:
+        description: Build the web image after its public endpoints are known
+        required: true
+        default: false
+        type: boolean
+      api_url:
+        description: Public API base URL ending in /api/v1
+        required: false
+        type: string
+      supabase_url:
+        description: Public Supabase project URL
+        required: false
+        type: string
+      supabase_publishable_key:
+        description: Public sb_publishable key used by the browser
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-production-images
+  cancel-in-progress: false
+
+jobs:
+  api:
+    name: Publish API, worker, and migrator
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Log in to GitHub Container Registry
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
+      - name: Build and publish API image
+        env:
+          IMAGE: ghcr.io/deterlicious/lifehub-api
+        run: |
+          docker build \
+            --file services/api/Dockerfile \
+            --label org.opencontainers.image.source=https://github.com/Deterlicious/LifeHub \
+            --label org.opencontainers.image.revision="${{ github.sha }}" \
+            --tag "$IMAGE:${{ github.sha }}" \
+            --tag "$IMAGE:latest" \
+            services/api
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:latest"
+
+  web:
+    name: Publish web
+    if: ${{ inputs.publish_web }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      LIFEHUB_API_URL: ${{ inputs.api_url }}
+      LIFEHUB_SUPABASE_URL: ${{ inputs.supabase_url }}
+      LIFEHUB_SUPABASE_PUBLISHABLE_KEY: ${{ inputs.supabase_publishable_key }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate public build configuration
+        shell: bash
+        run: |
+          [[ "$LIFEHUB_API_URL" == https://*/api/v1 ]]
+          [[ "$LIFEHUB_SUPABASE_URL" == https://*.supabase.co ]]
+          [[ "$LIFEHUB_SUPABASE_PUBLISHABLE_KEY" == sb_publishable_* ]]
+      - name: Log in to GitHub Container Registry
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
+      - name: Build and publish web image
+        env:
+          IMAGE: ghcr.io/deterlicious/lifehub-web
+        run: |
+          docker build \
+            --file apps/web/Dockerfile \
+            --build-arg NEXT_PUBLIC_API_URL="$LIFEHUB_API_URL" \
+            --build-arg NEXT_PUBLIC_AUTH_MODE=supabase \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL="$LIFEHUB_SUPABASE_URL" \
+            --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$LIFEHUB_SUPABASE_PUBLISHABLE_KEY" \
+            --label org.opencontainers.image.source=https://github.com/Deterlicious/LifeHub \
+            --label org.opencontainers.image.revision="${{ github.sha }}" \
+            --tag "$IMAGE:${{ github.sha }}" \
+            --tag "$IMAGE:latest" \
+            .
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:latest"

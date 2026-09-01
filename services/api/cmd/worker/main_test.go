@@ -35,3 +35,43 @@ func TestStopWorkerBoundsHardCancellation(t *testing.T) {
 		t.Fatalf("bounded shutdown took %s", elapsed)
 	}
 }
+
+func TestParseRuntimeModeDefaultsToContinuousPeriodicWorker(t *testing.T) {
+	mode, err := parseRuntimeMode("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mode.runDuration != 0 || !mode.periodicJobs {
+		t.Fatalf("mode=%+v", mode)
+	}
+}
+
+func TestParseRuntimeModeSupportsBoundedReminderOnlyJob(t *testing.T) {
+	mode, err := parseRuntimeMode("45s", "false")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mode.runDuration != 45*time.Second || mode.periodicJobs {
+		t.Fatalf("mode=%+v", mode)
+	}
+}
+
+func TestParseRuntimeModeRejectsUnsafeValues(t *testing.T) {
+	tests := []struct {
+		name     string
+		duration string
+		periodic string
+	}{
+		{name: "malformed duration", duration: "soon"},
+		{name: "too short", duration: "1s"},
+		{name: "too long", duration: "10m"},
+		{name: "invalid periodic flag", periodic: "sometimes"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := parseRuntimeMode(test.duration, test.periodic); err == nil {
+				t.Fatal("expected validation error")
+			}
+		})
+	}
+}
