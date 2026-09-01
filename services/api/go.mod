@@ -4,6 +4,8 @@ go 1.27.0
 
 require (
 	github.com/MicahParks/keyfunc/v3 v3.8.1
+	github.com/aws/aws-lambda-go v1.55.0
+	github.com/awslabs/aws-lambda-go-api-proxy v0.16.2
 	github.com/go-chi/chi/v5 v5.3.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/jackc/pgx/v5 v5.10.0

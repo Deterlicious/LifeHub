@@ -1,0 +1,47 @@
+[build]
+  command = "node scripts/netlify-build.mjs"
+  publish = "apps/web/out"
+
+[build.environment]
+  GO_VERSION = "1.27.0"
+  LIFEHUB_STATIC_EXPORT = "true"
+  NEXT_PUBLIC_AUTH_MODE = "supabase"
+  NODE_VERSION = "24.19.0"
+
+[functions]
+  directory = "services/api/netlify/functions"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/healthz"
+  to = "/.netlify/functions/api/healthz"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/readyz"
+  to = "/.netlify/functions/api/readyz"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; base-uri 'self'; connect-src 'self' https://gyppjjrejzpzarvwzboq.supabase.co; font-src 'self'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data: blob:; object-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+    Cross-Origin-Opener-Policy = "same-origin"
+    Cross-Origin-Resource-Policy = "same-origin"
+    Permissions-Policy = "camera=(), geolocation=(), microphone=()"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"

@@ -2,7 +2,7 @@
 
 LifeHub may store private personal planning data. Security is a product requirement.
 
-Status note: task/Today, event, bill, document expiry/management, Agenda & Corrections, durable reminders/notifications, recurrence, and draft-only Smart Capture are implemented and locally verified as recorded. Hosted auth, backup/restore operations, and production deployment remain outside the verified scope.
+Status note: task/Today, event, bill, document expiry/management, Agenda & Corrections, durable reminders/notifications, recurrence, and draft-only Smart Capture are implemented and locally verified as recorded. The hosted Supabase ES256 JWKS and database schemas are verified. Browser auth, backup/restore operations, and the public production journey remain outside the verified scope.
 
 ## Threats
 
@@ -163,11 +163,11 @@ govulncheck ./...
 go list -m -u all
 ```
 
-The latest scans on 29 August 2026 reported no Go vulnerabilities and no known high-severity pnpm vulnerabilities after recurrence, Smart Capture, production hardening, Go 1.27.0, and the final stable web dependency update. All 502 resolved npm packages have verified registry signatures; only the documented TypeScript/ESLint/Node-type compatibility pins remain behind their registry latest versions.
+The latest scans on 2 September 2026 reported no Go vulnerabilities and no known high-severity pnpm vulnerabilities after recurrence, Smart Capture, production hardening, the stable Netlify adapter, Go 1.27.0, and pnpm 11.25.0. All 502 resolved npm packages have verified registry signatures; only the documented TypeScript/ESLint/Node-type compatibility pins remain behind their registry latest versions.
 
 ## Current limits
 
-- Hosted Supabase login has not been manually exercised because no project credentials were provided; asymmetric verifier behavior is covered by automated JWKS tests.
+- The Supabase Free project, ES256 JWKS endpoint, and hosted application/River migrations are verified. Hosted browser sign-in, refresh, sign-out, and session recovery have not yet been manually exercised.
 - Event list/get/edit/delete, Agenda, bill list/get/edit/delete/mark-unpaid, document metadata CRUD, reminder CRUD, notification read actions, recurrence series/occurrences, and ordinary writes created from reviewed Smart Capture drafts are implemented with server-side ownership enforcement. Document file storage remains explicitly excluded.
 - Authenticated users can permanently delete all of their LifeHub application data through an exact typed confirmation. The transaction cancels their scheduled River reminder jobs before the profile cascade and cannot accept a browser-supplied owner ID. The Supabase authentication identity remains separate and is clearly disclosed in the UI.
 - Development login is for local use only and is not a production identity provider.

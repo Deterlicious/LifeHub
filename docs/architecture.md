@@ -1,6 +1,6 @@
 # LifeHub Architecture
 
-Status: task/Today, event, bill, document expiry/management, Agenda & Corrections, durable reminders/notifications, recurrence, and draft-only Smart Capture are implemented and locally verified. Hosted auth and deployment remain unverified.
+Status: task/Today, event, bill, document expiry/management, Agenda & Corrections, durable reminders/notifications, recurrence, and draft-only Smart Capture are implemented and locally verified. Supabase Auth/JWKS and hosted migrations are provisioned; the public Netlify deployment and browser auth journey remain unverified.
 
 ## Goals
 
@@ -308,4 +308,4 @@ No default requirement for:
 
 ## Current slice deferrals
 
-Agenda & Corrections supplies bounded event management, task/bill corrections and inverse actions, paid-history cursor pagination, and one mixed-domain chronological view while Today remains primary. The Documents slice includes metadata management but intentionally excludes file storage. Durable reminders use exact-pinned River v0.44.0 and PostgreSQL for transactionally scheduled jobs and duplicate-safe notifications. Recurrence and draft-only Smart Capture are active. Hosted Supabase validation and public deployment remain explicit later work.
+Agenda & Corrections supplies bounded event management, task/bill corrections and inverse actions, paid-history cursor pagination, and one mixed-domain chronological view while Today remains primary. The Documents slice includes metadata management but intentionally excludes file storage. Durable reminders use exact-pinned River v0.44.0 and PostgreSQL for transactionally scheduled jobs and duplicate-safe notifications. Recurrence and draft-only Smart Capture are active. Supabase ES256 JWKS and hosted schemas are verified; hosted browser-session recovery, ingress headers, and the public Netlify journey remain release work.

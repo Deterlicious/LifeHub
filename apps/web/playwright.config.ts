@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const webBaseUrl = process.env.LIFEHUB_E2E_WEB_URL ?? "http://127.0.0.1:3000";
+const webPort = new URL(webBaseUrl).port || "3000";
 const apiBaseUrl = process.env.LIFEHUB_E2E_API_URL ?? "http://127.0.0.1:8080/api/v1";
 const customApiCommand = process.env.LIFEHUB_E2E_API_COMMAND;
 const apiCommand = customApiCommand ?? "node ./scripts/start-e2e-backend.mjs";
@@ -28,7 +29,7 @@ const webServers = [
     env: e2eEnvironment,
   },
   {
-    command: "pnpm dev --hostname 127.0.0.1 --port 3000",
+    command: `pnpm dev --hostname 127.0.0.1 --port ${webPort}`,
     cwd: currentDirectory,
     url: webBaseUrl,
     reuseExistingServer: false,

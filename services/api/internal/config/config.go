@@ -13,6 +13,8 @@ type Config struct {
 	AppEnv           string
 	HTTPAddr         string
 	DatabaseURL      string
+	DatabaseMaxConns int32
+	DatabaseMinConns int32
 	WebOrigins       []string
 	SupabaseJWKSURL  string
 	SupabaseIssuer   string
@@ -25,15 +27,29 @@ func (c Config) Production() bool {
 }
 
 func Load() (Config, error) {
+	appEnv := envOrDefault("APP_ENV", "development")
 	httpAddr, err := resolveHTTPAddr()
 	if err != nil {
 		return Config{}, err
 	}
+	maxConns, err := envInt32("DATABASE_MAX_CONNS", 12, 1, 100)
+	if err != nil {
+		return Config{}, err
+	}
+	minConns, err := envInt32("DATABASE_MIN_CONNS", 1, 0, 100)
+	if err != nil {
+		return Config{}, err
+	}
+	if minConns > maxConns {
+		return Config{}, fmt.Errorf("DATABASE_MIN_CONNS must not exceed DATABASE_MAX_CONNS")
+	}
 	config := Config{
-		AppEnv:           envOrDefault("APP_ENV", "development"),
+		AppEnv:           appEnv,
 		HTTPAddr:         httpAddr,
 		DatabaseURL:      strings.TrimSpace(os.Getenv("DATABASE_URL")),
-		WebOrigins:       splitOrigins(envOrDefault("WEB_ORIGIN", "http://localhost:3000")),
+		DatabaseMaxConns: maxConns,
+		DatabaseMinConns: minConns,
+		WebOrigins:       resolveWebOrigins(appEnv),
 		SupabaseJWKSURL:  strings.TrimSpace(os.Getenv("SUPABASE_JWKS_URL")),
 		SupabaseIssuer:   strings.TrimSpace(os.Getenv("SUPABASE_ISSUER")),
 		SupabaseAudience: envOrDefault("SUPABASE_AUDIENCE", "authenticated"),
@@ -75,6 +91,20 @@ func Load() (Config, error) {
 	return config, nil
 }
 
+func resolveWebOrigins(appEnv string) []string {
+	value := strings.TrimSpace(os.Getenv("WEB_ORIGIN"))
+	if value == "" && appEnv == "production" {
+		// Netlify supplies URL to both builds and Functions. It is safe to use as
+		// the same-origin CORS fallback, while other hosts must still set
+		// WEB_ORIGIN explicitly.
+		value = strings.TrimSpace(os.Getenv("URL"))
+	}
+	if value == "" {
+		value = "http://localhost:3000"
+	}
+	return splitOrigins(value)
+}
+
 func resolveHTTPAddr() (string, error) {
 	if value := strings.TrimSpace(os.Getenv("HTTP_ADDR")); value != "" {
 		return value, nil
@@ -103,6 +133,18 @@ func parsePort(value string) (int, error) {
 		return 0, fmt.Errorf("must be an integer from 1 through 65535")
 	}
 	return port, nil
+}
+
+func envInt32(name string, fallback, minimum, maximum int32) (int32, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.ParseInt(value, 10, 32)
+	if err != nil || parsed < int64(minimum) || parsed > int64(maximum) {
+		return 0, fmt.Errorf("%s must be an integer from %d through %d", name, minimum, maximum)
+	}
+	return int32(parsed), nil
 }
 
 func validateLoopbackAddress(value string) error {

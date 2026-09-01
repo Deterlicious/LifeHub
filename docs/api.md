@@ -460,7 +460,7 @@ Metadata-only PATCH may update title, notes, or location without changing the sc
 
 The strict union, ownership rules, PostgreSQL persistence, Today/Agenda integration, list overlap, and correction behavior are covered by HTTP, real-database, ordering, browser-persistence, and race tests.
 
-Events can opt into the implemented recurrence contract below and use the separate one-off reminder contract. Hosted Supabase validation and deployment remain deferred.
+Events can opt into the implemented recurrence contract below and use the separate one-off reminder contract. Supabase ES256 JWKS and hosted database migrations are verified; browser sign-in and the public Netlify journey remain release gates.
 
 ---
 

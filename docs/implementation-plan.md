@@ -1,7 +1,7 @@
 # LifeHub Implementation Plan
 
-Status: **MVP domain slices, durable reminders, recurrence, Smart Quick Add, and local release gates are verified; hosted deployment is pending external configuration and approval**
-Last updated: **1 September 2026**
+Status: **MVP domain slices, durable reminders, recurrence, Smart Quick Add, and local release gates are verified; Supabase is migrated and the public Netlify deployment is pending**
+Last updated: **2 September 2026**
 
 ## Inspected baseline
 
@@ -13,9 +13,9 @@ The supplied workspace was a flattened documentation-only cold-start bundle:
 - the intended engineering documents arrived at repository root and have been moved under `docs/`;
 - tools at inspection: Node.js 22.21.0, pnpm 11.20.0, Go 1.26.1, Docker 29.7.2, and Docker Compose 5.4.0;
 - Docker Desktop is available; `psql`, `sqlc`, Goose, Supabase CLI, and `govulncheck` are not installed globally;
-- no Supabase project configuration or other application credentials exist in the workspace.
+- the supplied workspace contained no Supabase project configuration or application credentials; production secrets remain outside the repository after later provisioning.
 
-The workspace now activates pnpm 11.24.0 and Go's module toolchain downloads Go 1.27.0. Node 24.19.0 remains the CI/production target; the inspected Node 22 host satisfies the dependency engine ranges used for local verification. Exact selections and compatibility pins are recorded in `docs/stack-versions.md`.
+The workspace now activates pnpm 11.25.0 and Go's module toolchain downloads Go 1.27.0. Node 24.19.0 remains the CI/production target; the inspected Node 22 host satisfies the dependency engine ranges used for local verification. Exact selections and compatibility pins are recorded in `docs/stack-versions.md`.
 
 ## Phase 0 — Inspect — complete
 
@@ -123,7 +123,7 @@ Exit met for the local development provider on 19 August 2026:
 - the E2E command starts a fresh migrated API/web stack instead of reusing an accidentally stale process;
 - primary navigation exposes only working Today and Add actions; mobile places Today before Quick Add, and the timezone dialog traps/restores focus and closes with Escape.
 
-Hosted Supabase sign-in and deployment are not claimed: no hosted credentials or production environment were supplied. The production verifier is instead covered by an asymmetric JWKS test server with issuer, audience, algorithm, expiry, and subject checks.
+This phase did not claim hosted sign-in or deployment. Later provisioning created the Supabase Free project, verified its ES256 JWKS, and migrated the hosted database; browser session recovery still requires the final public deployment. The production verifier remains covered by asymmetric JWKS tests for issuer, audience, algorithm, expiry, and subject checks.
 
 ## Phase 3 — Hosted auth and production validation
 
@@ -166,7 +166,7 @@ Explicitly deferred from this slice:
 
 - event edit/delete and a separate Calendar/history view;
 - recurrence and reminders;
-- hosted Supabase validation, which still requires external project credentials.
+- hosted Supabase browser-session validation, which remains a final public-deployment journey.
 
 Required edge proof: timed events at local-day boundaries, ongoing overlap, all-day date ranges, DST-invalid wall times, end-before-start, ownership isolation, mixed Today ordering, and reload persistence.
 
@@ -407,31 +407,34 @@ Completed locally:
 - exact-confirmation application-data deletion is implemented through the verified identity, cancels scheduled reminder jobs transactionally, cascades owned PostgreSQL rows, and clearly leaves the separate Supabase identity intact. HTTP/client tests, PostgreSQL integration proof, and the mobile E2E journey all pass.
 - the final lockfile has no known high-severity advisory, all 502 packages have verified registry signatures, the only outdated web packages are three documented compatibility pins, the Go graph resolves no retracted module, and `govulncheck` reports no vulnerability.
 
-Release gates still open on 1 September 2026:
+Release gates still open on 2 September 2026:
 
-- publish the verified production images and confirm anonymous pull access before the free host uses them;
+- retain the verified public production image for container-capable alternatives; Netlify uses the same Go handler through its stable Go Function adapter;
 - complete manual 360px/200%-zoom/accessibility verification;
 - define and test production backup/restore plus any required Supabase identity-deletion procedure;
-- create a Supabase Free project and a Render Free workspace without a payment method;
+- deploy the already migrated Supabase Free project through a no-card, hard-limit host;
 - after provisioning, verify hosted auth/session recovery, TLS/CORS/headers, worker delivery, monitoring, and the critical production journey.
 
 ## Strict zero-charge deployment track — in progress
 
 The owner requires a deployment with no path to a charge. Google Cloud Free Tier was rejected because the linked billing account remains open and its IDR 25,000 alerts-only budget is not a global hard cap. Read-only inspection confirmed that no `lifehub-*` Cloud Run service or job exists; existing BagiYuk resources remain untouched.
 
-The selected hard-free topology keeps the existing security and persistence boundaries:
+Supabase project `LifeHub` is healthy in Singapore, its ES256 JWKS is publicly reachable, and GitHub Actions run `33546915708` applied both the application and pinned River migrations successfully. The production database URL is stored only as the `LIFEHUB_DATABASE_URL` repository secret.
+
+Render was rejected during provisioning on 2 September 2026. Although the workspace remained on Hobby with no card on file, Render required an `Add credit card to verify your identity` step before creating the Blueprint. No card was submitted and no Render service was created.
+
+The replacement hard-free topology keeps the existing security and persistence boundaries:
 
 ```text
 Supabase Free Auth + PostgreSQL
         │
-        ├── Render Free API (suspends at free limits)
-        ├── Render free static web
+        ├── Netlify Free static web + Go Function API
         └── public-repository GitHub Actions worker (every 15 minutes)
 ```
 
-The API image is already public on GHCR and pinned by commit in the deployment files. `render.free.yaml` passed the current official schema with zero errors. The Next application now has an opt-in static export that produced `apps/web/out/index.html`; normal standalone container behavior remains unchanged. Manual migrations and the disabled-by-default bounded worker workflows pass `actionlint`.
+The existing API image remains public on GHCR and pinned by commit for container-capable hosts. The Next application has an opt-in static export that produced `apps/web/out/index.html`; normal standalone container behavior remains unchanged. Manual migrations and the disabled-by-default bounded worker workflows pass `actionlint`.
 
-Provisioning remains blocked until Supabase and Render authentication is completed. Render must have no payment method, only the explicit `free` plan/static site may be created, and the scheduled worker remains disabled until hosted database and reminder verification pass. The tradeoff is cold starts, possible scheduling delay, and suspension at free quotas rather than a charge.
+The Netlify adapter reuses the existing Go handler and private PostgreSQL boundary, keeps serverless connection pools bounded, and returns a redacted retry response if cold initialization fails. Netlify CLI 27.4.2 successfully built the static Next export and packaged the Go Function locally. Netlify Free has a fixed 300-credit monthly hard limit and no auto-recharge; projects pause at the limit rather than incur a charge. The scheduled worker remains disabled until hosted database and reminder verification pass. The tradeoff is Lambda cold starts, possible scheduling delay, and suspension at free quotas rather than a charge.
 
 ## Definition of done
 

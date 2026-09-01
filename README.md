@@ -62,7 +62,7 @@ authenticated user
   → save through the normal owned Go API
 ```
 
-The responsive Next.js UI, Go API, restartable Go worker, seven Goose migrations, River schema pinned at version 7, PostgreSQL 18.6 development service, unit/integration tests, and eight mobile/desktop Playwright cases are present. Agenda and all correction APIs are uncapped or explicitly cursor-paginated, ownership-scoped, and tested across ordinary DST changes, midnight gaps, and skipped civil dates. The production Supabase JWKS verifier is automated against an asymmetric test JWKS; hosted Supabase login and any deployment remain unverified because no external credentials were supplied.
+The responsive Next.js UI, Go API, restartable Go worker, seven Goose migrations, River schema pinned at version 7, PostgreSQL 18.6 development service, unit/integration tests, and eight mobile/desktop Playwright cases are present. Agenda and all correction APIs are uncapped or explicitly cursor-paginated, ownership-scoped, and tested across ordinary DST changes, midnight gaps, and skipped civil dates. A Supabase Free project is provisioned, its ES256 JWKS is verified, and the application plus River migrations passed against the hosted database. Browser sign-in and the public deployment remain unverified until the final Netlify deployment and hosted journey are exercised.
 
 ## Events → Today
 
@@ -79,7 +79,7 @@ authenticated user
 
 The agreed create contract uses `starts_local`/`ends_local` for timed events and `starts_on`/`ends_on` for all-day events. Timed values are interpreted in the authenticated profile's IANA timezone and stored as instants; all-day values retain date semantics, with `ends_on` inclusive. These are strict alternative input shapes, not interchangeable fields.
 
-Agenda & Corrections subsequently added bounded event list/get/edit/delete and strict schedule replacement without turning LifeHub into a generic event admin page. Recurrence and reminders are implemented through the shared series and durable-job engines; hosted Supabase validation and deployment remain follow-up work. No additional event-specific dependency was needed.
+Agenda & Corrections subsequently added bounded event list/get/edit/delete and strict schedule replacement without turning LifeHub into a generic event admin page. Recurrence and reminders are implemented through the shared series and durable-job engines. Supabase JWKS and database migrations are hosted and verified; browser-session validation and public deployment remain follow-up work. No additional event-specific dependency was needed.
 
 ## Bills → Today
 
@@ -109,7 +109,7 @@ Smart Quick Add is a draft accelerator, not an autonomous writer. Its authentica
 
 ## Product scope
 
-The full LifeHub direction includes the domains below. The task, event, bill, document expiry/management, Agenda & Corrections, durable reminder, recurrence, and draft-only Smart Quick Add journeys described above are implemented and locally verified. Hosted auth and public deployment are still pending external configuration and final production gates.
+The full LifeHub direction includes the domains below. The task, event, bill, document expiry/management, Agenda & Corrections, durable reminder, recurrence, and draft-only Smart Quick Add journeys described above are implemented and locally verified. Supabase Auth/JWKS and database migrations are provisioned; hosted browser auth and the public Netlify journey are still pending final production gates.
 
 ### Today
 One ordered daily feed:
@@ -353,4 +353,4 @@ The settings dialog includes an exact typed-confirmation action to remove every 
 
 ## Status
 
-**Task/Today, event, bill, document expiry/management, Agenda & Corrections, durable reminders/notifications, recurrence, and draft-only Smart Quick Add are implemented and locally verified.** Hosted Supabase auth and public deployment are not yet verified. `render.free.yaml` is the selected zero-charge profile; the paid `render.yaml` is retained as an unselected alternative and must not be provisioned.
+**Task/Today, event, bill, document expiry/management, Agenda & Corrections, durable reminders/notifications, recurrence, and draft-only Smart Quick Add are implemented and locally verified.** Supabase Free, ES256 JWKS, and the hosted database migrations are verified. Netlify Free is the selected no-card, hard-limit host, and its static-web plus Go Function build passes locally; public deployment and hosted browser auth are not yet claimed. Both Render profiles are retained as unselected references and must not be provisioned while the strict zero-charge policy remains active.

@@ -15,9 +15,11 @@ test-results/
 # Go
 bin/
 *.test
+*.exe
 coverage.out
 
 # Local tooling
+.netlify/
 .idea/
 .vscode/
 .DS_Store

@@ -26,13 +26,25 @@ type Store struct {
 	riverClient *river.Client[pgx.Tx]
 }
 
+type PoolSettings struct {
+	MaxConns int32
+	MinConns int32
+}
+
 func Open(ctx context.Context, databaseURL string) (*Store, error) {
+	return OpenWithPoolSettings(ctx, databaseURL, PoolSettings{MaxConns: 12, MinConns: 1})
+}
+
+func OpenWithPoolSettings(ctx context.Context, databaseURL string, settings PoolSettings) (*Store, error) {
+	if settings.MaxConns < 1 || settings.MinConns < 0 || settings.MinConns > settings.MaxConns {
+		return nil, fmt.Errorf("invalid database pool settings")
+	}
 	config, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
-		return nil, fmt.Errorf("parse database url: %w", err)
+		return nil, fmt.Errorf("parse database configuration")
 	}
-	config.MaxConns = 12
-	config.MinConns = 1
+	config.MaxConns = settings.MaxConns
+	config.MinConns = settings.MinConns
 	config.MaxConnLifetime = time.Hour
 	config.MaxConnIdleTime = 15 * time.Minute
 	config.HealthCheckPeriod = time.Minute

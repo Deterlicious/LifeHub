@@ -1,6 +1,6 @@
 # LifeHub Stack Versions
 
-Verified: **30 August 2026** against official release pages, npm registry metadata, container registries, and the Go module proxy. Runtime pins and post-update gates reflect the recurrence, Smart Capture, data deletion, and production-hardening slices.
+Verified: **2 September 2026** against official release pages, npm registry metadata, container registries, provider documentation, and the Go module proxy. Runtime pins and post-update gates reflect the recurrence, Smart Capture, data deletion, production-hardening, and Netlify deployment-adapter slices.
 
 This file distinguishes the host environment, the compatible versions selected for the first slice, and dependencies intentionally deferred. The root `pnpm-lock.yaml`, `apps/web/package.json`, and `services/api/go.mod` are the installed source of truth.
 
@@ -18,7 +18,7 @@ Never use beta/canary/RC/deprecated/abandoned dependencies unless explicitly app
 |---|---:|---:|---|
 | Go | 1.27.0 | 1.26.1 system; 1.27.0 module toolchain | `go 1.27.0` makes the Go tool download/use the current stable release through `GOTOOLCHAIN=auto`. |
 | Node.js | 24.19.0 LTS | 22.21.0 | Target Node 24 LTS in CI/production. Host Node 22 still satisfies selected package engines and may bootstrap locally. |
-| pnpm | 11.24.0 | 11.20.0 initially; 11.24.0 activated | Pinned by `packageManager`; the frozen workspace install uses 11.24.0. |
+| pnpm | 11.25.0 | 11.20.0 initially; 11.25.0 activated | Pinned by `packageManager`; the frozen workspace install uses the current stable 11.25.0 patch. |
 | PostgreSQL | 18.6 | 18.6-alpine in Docker; 18.6 Windows service and 16.15 WSL test cluster | Selected current supported 18.x minor; PostgreSQL 19 beta is excluded. Local host port is `55432` because the usual range was reserved on this Windows host. |
 | Docker Engine | 29.7.2 | 29.7.2 | Local infrastructure only; not an application dependency. |
 | Docker Compose | 5.4.0 | 5.4.0 | Available locally. |
@@ -93,6 +93,8 @@ The implemented document slice required **no new frontend dependency**. Native d
 | github.com/riverqueue/river | v0.44.0 | Exact runtime pin for durable PostgreSQL jobs. Registry latest is v0.46.0, but River remains pre-1.0 and the schema/worker contracts are verified together at v0.44.0; an upgrade requires an explicit compatibility/migration review. |
 | github.com/riverqueue/river/riverdriver/riverpgxv5 | v0.44.0 | Exact pgx v5 driver pin matching River and pgx 5.10.0. |
 | github.com/riverqueue/river/rivertype | v0.44.0 | Direct worker/error-handler job-row contract, kept at the same exact version. |
+| github.com/aws/aws-lambda-go | v1.55.0 | Stable Lambda runtime used only by the Netlify Go Function entry point. |
+| github.com/awslabs/aws-lambda-go-api-proxy | v0.16.2 | Stable adapter that translates Netlify's Lambda-compatible request to the existing Go HTTP handler. |
 
 Only runtime modules actually used belong in the compiled dependency graph. The application generates UUIDv4 values with the standard library and uses explicit parameterized pgx SQL. sqlc v1.31.1 was verified but deferred until the query surface is large enough to justify generation; it is not falsely presented as installed.
 
@@ -160,7 +162,7 @@ go tool govulncheck ./...
 
 The results in this section include all implemented MVP slices through recurrence, Smart Capture, and production hardening.
 
-Web direct dependencies are exactly pinned in `apps/web/package.json` at the selected versions above; the single root `pnpm-lock.yaml` owns the workspace. No nested lockfile exists. A frozen install completed with pnpm 11.24.0, and these gates passed after the final dependency update on 30 August 2026:
+Web direct dependencies are exactly pinned in `apps/web/package.json` at the selected versions above; the single root `pnpm-lock.yaml` owns the workspace. No nested lockfile exists. A frozen install completed with pnpm 11.25.0, and these gates passed after the deployment-adapter update on 2 September 2026:
 
 ```text
 pnpm install --frozen-lockfile
@@ -170,9 +172,9 @@ pnpm test                 # 8 files, 63 tests
 pnpm build                # Next 16.3.3 production build
 ```
 
-After the 1.37.0 Lucide update, `pnpm audit --audit-level high` reports no known vulnerabilities and `pnpm audit signatures` verifies all 502 packages. `pnpm outdated --recursive` now reports only the three intentional compatibility pins already explained above: TypeScript 6.0.3, ESLint 9.39.5, and Node 24 type definitions 24.13.3. The eight-case Playwright suite passed end-to-end on 30 August 2026 against a fresh migrated PostgreSQL database with the stable 2-worker cap documented in `apps/web/playwright.config.ts`.
+After the pnpm 11.25.0 patch update, `pnpm audit --audit-level high` reports no known vulnerabilities and `pnpm audit signatures` verifies all 502 packages. `pnpm outdated --recursive` reports only the three intentional compatibility pins already explained above: TypeScript 6.0.3, ESLint 9.39.5, and Node 24 type definitions 24.13.3. The eight-case Playwright suite passed end-to-end on 2 September 2026 against a fresh migrated PostgreSQL database; its configurable web port prevented an unrelated local project from being interrupted.
 
-The Go module is pinned to Go 1.27.0 with the direct runtime/migration dependencies shown above and `govulncheck` 1.7.0 as a tracked tool. These gates passed after migration 7 against PostgreSQL 18.6 on 30 August 2026:
+The Go module is pinned to Go 1.27.0 with the direct runtime/migration dependencies shown above and `govulncheck` 1.7.0 as a tracked tool. These gates, including the new Netlify entry point, passed after migration 7 against PostgreSQL 18.6 on 2 September 2026:
 
 ```text
 TEST_DATABASE_URL=... go test -tags=integration -count=1 ./...
@@ -184,14 +186,15 @@ go tool govulncheck ./...               # no vulnerabilities found
 
 Production images are pinned to stable `golang:1.27.0-alpine3.24`, `node:24.19.0-alpine3.24`, and `alpine:3.24.1` bases. Both images built and smoke-tested locally before the host Docker engine became unavailable; a final rebuild remains part of the release gate.
 
-## Hosting tooling and zero-charge decision — verified 1 September 2026
+## Hosting tooling and zero-charge decision — verified 2 September 2026
 
 | Tool/platform | Verified value | Decision |
 | --- | --- | --- |
 | Google Cloud CLI | 579.0.0 | Authenticated locally as `vivoy51577@gmail.com`; used for read-only project and billing inspection before provisioning. |
 | Google Cloud project | `project-592af0e7-ebee-4483-88e` | Read-only inspection only. LifeHub creates no GCP resource because alerts-only budgets cannot guarantee a global zero charge; existing BagiYuk resources remain untouched. |
-| Render | Free web service + free static site | Selected only without a payment method. Free quotas suspend the service/build instead of charging; the API has cold starts and no production SLA. |
-| Supabase | Free Nano planned | Auth plus PostgreSQL source of truth; the current free database quota enters read-only mode beyond 500 MB. |
+| Render | Hobby workspace, no card | Rejected during provisioning because the dashboard required a credit card before Blueprint creation. No card or service was added. |
+| Netlify | Free plan; CLI 27.4.2 | Selected replacement: 300 credits/month with a hard limit and no auto-recharge; projects pause instead of generating a charge. The official local build packages the static export and stable Go Function successfully. |
+| Supabase | Free Nano active | LifeHub Auth plus PostgreSQL source of truth in Singapore; ES256 JWKS verified and migrations passed in GitHub Actions run `33546915708`. |
 | GitHub Container Registry | public API image verified | Anonymous manifest retrieval returned HTTP 200; deployment workflows pin commit `1a463e5afc7fa88df30717525d3721b02ccc90c4`. |
 | GitHub Actions | public repository standard runners | Scheduled 45-second worker and manual migrator; free for public repositories and disabled until production verification. |
 | Next static export | Next.js 16.3.3 | Opt-in `LIFEHUB_STATIC_EXPORT=true` build produced `apps/web/out/index.html`; standalone output remains the default. |
