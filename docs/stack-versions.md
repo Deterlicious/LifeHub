@@ -184,15 +184,16 @@ go tool govulncheck ./...               # no vulnerabilities found
 
 Production images are pinned to stable `golang:1.27.0-alpine3.24`, `node:24.19.0-alpine3.24`, and `alpine:3.24.1` bases. Both images built and smoke-tested locally before the host Docker engine became unavailable; a final rebuild remains part of the release gate.
 
-## Google Cloud deployment tooling — verified 1 September 2026
+## Hosting tooling and zero-charge decision — verified 1 September 2026
 
 | Tool/platform | Verified value | Decision |
 | --- | --- | --- |
 | Google Cloud CLI | 579.0.0 | Authenticated locally as `vivoy51577@gmail.com`; used for read-only project and billing inspection before provisioning. |
-| Google Cloud project | `project-592af0e7-ebee-4483-88e` | Owner-selected project; existing BagiYuk resources are out of scope and must remain untouched. |
-| Cloud Run | managed, `asia-southeast1` candidate | Web/API scale to zero; two bounded jobs replace an always-on paid worker in the free-tier profile. |
-| Cloud Scheduler | two jobs planned | Reminder batch every 15 minutes and recurrence maintenance twice daily; within the account's three-job free allowance if no other scheduler jobs exist. |
+| Google Cloud project | `project-592af0e7-ebee-4483-88e` | Read-only inspection only. LifeHub creates no GCP resource because alerts-only budgets cannot guarantee a global zero charge; existing BagiYuk resources remain untouched. |
+| Render | Free web service + free static site | Selected only without a payment method. Free quotas suspend the service/build instead of charging; the API has cold starts and no production SLA. |
 | Supabase | Free Nano planned | Auth plus PostgreSQL source of truth; the current free database quota enters read-only mode beyond 500 MB. |
-| GitHub Container Registry | public images planned | Public container storage/bandwidth is currently free and Cloud Run can import public GHCR images directly. |
+| GitHub Container Registry | public API image verified | Anonymous manifest retrieval returned HTTP 200; deployment workflows pin commit `1a463e5afc7fa88df30717525d3721b02ccc90c4`. |
+| GitHub Actions | public repository standard runners | Scheduled 45-second worker and manual migrator; free for public repositories and disabled until production verification. |
+| Next static export | Next.js 16.3.3 | Opt-in `LIFEHUB_STATIC_EXPORT=true` build produced `apps/web/out/index.html`; standalone output remains the default. |
 
 These are deployment platform decisions, not new application runtime dependencies. No prerelease package is introduced.

@@ -1,0 +1,36 @@
+name: Run free durable worker
+
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lifehub-production-worker
+  cancel-in-progress: false
+
+jobs:
+  worker:
+    name: Deliver reminders and extend recurrence
+    if: ${{ vars.LIFEHUB_FREE_DEPLOYMENT_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      DATABASE_URL: ${{ secrets.LIFEHUB_DATABASE_URL }}
+      IMAGE: ghcr.io/deterlicious/lifehub-api:1a463e5afc7fa88df30717525d3721b02ccc90c4
+    steps:
+      - name: Require the production database secret
+        shell: bash
+        run: test -n "$DATABASE_URL"
+      - name: Run a bounded durable worker window
+        shell: bash
+        run: |
+          docker run --rm \
+            --env DATABASE_URL \
+            --env WORKER_RUN_DURATION=45s \
+            --env WORKER_PERIODIC_JOBS=true \
+            "$IMAGE" \
+            /usr/local/bin/worker

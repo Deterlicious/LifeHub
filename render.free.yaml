@@ -1,0 +1,63 @@
+services:
+  - type: web
+    name: lifehub-api
+    runtime: image
+    plan: free
+    region: singapore
+    image:
+      url: ghcr.io/deterlicious/lifehub-api:1a463e5afc7fa88df30717525d3721b02ccc90c4
+    dockerCommand: /usr/local/bin/api
+    healthCheckPath: /readyz
+    maxShutdownDelaySeconds: 45
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: WEB_ORIGIN
+        sync: false
+      - key: SUPABASE_ISSUER
+        sync: false
+      - key: SUPABASE_JWKS_URL
+        sync: false
+      - key: SUPABASE_AUDIENCE
+        value: authenticated
+
+  - type: web
+    name: lifehub-web
+    runtime: static
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --dir apps/web build
+    staticPublishPath: ./apps/web/out
+    envVars:
+      - key: LIFEHUB_STATIC_EXPORT
+        value: "true"
+      - key: NEXT_PUBLIC_API_URL
+        sync: false
+      - key: NEXT_PUBLIC_AUTH_MODE
+        value: supabase
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+    headers:
+      - path: /*
+        name: Cross-Origin-Opener-Policy
+        value: same-origin
+      - path: /*
+        name: Cross-Origin-Resource-Policy
+        value: same-origin
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(), geolocation=(), microphone=()
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=31536000; includeSubDomains
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: DENY

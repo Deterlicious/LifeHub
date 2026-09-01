@@ -409,32 +409,29 @@ Completed locally:
 
 Release gates still open on 1 September 2026:
 
-- publish the verified production images and confirm anonymous pull access before Cloud Run uses them;
+- publish the verified production images and confirm anonymous pull access before the free host uses them;
 - complete manual 360px/200%-zoom/accessibility verification;
 - define and test production backup/restore plus any required Supabase identity-deletion procedure;
-- create a Supabase Free project and obtain explicit acknowledgement of Google Cloud's usage-based overage risk before provisioning;
+- create a Supabase Free project and a Render Free workspace without a payment method;
 - after provisioning, verify hosted auth/session recovery, TLS/CORS/headers, worker delivery, monitoring, and the critical production journey.
 
-## Google Cloud free-tier deployment track — in progress
+## Strict zero-charge deployment track — in progress
 
-The owner selected the existing Google Cloud project `project-592af0e7-ebee-4483-88e` for the hosted deployment. The project has billing enabled, Cloud Run and Cloud Build already enabled, one unrelated BagiYuk Cloud Run service, and an IDR 25,000 monthly budget alert. LifeHub must use isolated resource names and must not modify that existing service.
+The owner requires a deployment with no path to a charge. Google Cloud Free Tier was rejected because the linked billing account remains open and its IDR 25,000 alerts-only budget is not a global hard cap. Read-only inspection confirmed that no `lifehub-*` Cloud Run service or job exists; existing BagiYuk resources remain untouched.
 
-The closest sustainable free-tier topology keeps the existing security and persistence boundaries:
+The selected hard-free topology keeps the existing security and persistence boundaries:
 
 ```text
 Supabase Free Auth + PostgreSQL
         │
-        ├── Cloud Run lifehub-api (scale to zero)
-        ├── Cloud Run lifehub-web (scale to zero)
-        ├── Cloud Run Job reminder worker (every 15 minutes)
-        └── Cloud Run Job recurrence maintenance (twice daily)
-             ▲
-             └── two Cloud Scheduler jobs
+        ├── Render Free API (suspends at free limits)
+        ├── Render free static web
+        └── public-repository GitHub Actions worker (every 15 minutes)
 ```
 
-Public images will be published from the public GitHub repository to GHCR so LifeHub does not add to the Google Artifact Registry account usage that already exceeds its 0.5 GiB free allowance. The worker's ordinary continuous behavior remains the default; an explicitly configured bounded batch window will let Cloud Run Jobs stop cleanly. The free deployment trades exact reminder timing for delivery within roughly 15 minutes. Cloud SQL is excluded because it has trial credit rather than a permanent free PostgreSQL tier.
+The API image is already public on GHCR and pinned by commit in the deployment files. `render.free.yaml` passed the current official schema with zero errors. The Next application now has an opt-in static export that produced `apps/web/out/index.html`; normal standalone container behavior remains unchanged. Manual migrations and the disabled-by-default bounded worker workflows pass `actionlint`.
 
-Provisioning remains blocked until a Supabase Free project exists and the owner confirms that Google Cloud free tiers are usage limits rather than a hard spending cap. The existing budget sends alerts but cannot prevent charges by itself.
+Provisioning remains blocked until Supabase and Render authentication is completed. Render must have no payment method, only the explicit `free` plan/static site may be created, and the scheduled worker remains disabled until hosted database and reminder verification pass. The tradeoff is cold starts, possible scheduling delay, and suspension at free quotas rather than a charge.
 
 ## Definition of done
 

@@ -1,0 +1,31 @@
+name: Run free deployment migrations
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lifehub-production-migrations
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Apply application and River migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      DATABASE_URL: ${{ secrets.LIFEHUB_DATABASE_URL }}
+      IMAGE: ghcr.io/deterlicious/lifehub-api:1a463e5afc7fa88df30717525d3721b02ccc90c4
+    steps:
+      - name: Require the production database secret
+        shell: bash
+        run: test -n "$DATABASE_URL"
+      - name: Apply pinned migrations
+        shell: bash
+        run: |
+          docker run --rm \
+            --env DATABASE_URL \
+            "$IMAGE" \
+            /usr/local/bin/migrate

@@ -353,4 +353,4 @@ The settings dialog includes an exact typed-confirmation action to remove every 
 
 ## Status
 
-**Task/Today, event, bill, document expiry/management, Agenda & Corrections, durable reminders/notifications, recurrence, and draft-only Smart Quick Add are implemented and locally verified.** Hosted Supabase auth and public deployment are not yet verified; the checked-in production containers and Render Blueprint are preparation, not evidence of a live deployment.
+**Task/Today, event, bill, document expiry/management, Agenda & Corrections, durable reminders/notifications, recurrence, and draft-only Smart Quick Add are implemented and locally verified.** Hosted Supabase auth and public deployment are not yet verified. `render.free.yaml` is the selected zero-charge profile; the paid `render.yaml` is retained as an unselected alternative and must not be provisioned.

@@ -15,6 +15,7 @@ const connectOrigins = [
   configuredOrigin(process.env.NEXT_PUBLIC_SUPABASE_URL),
 ].filter((value): value is string => value !== null);
 const developmentScriptSource = process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'";
+const staticExport = process.env.LIFEHUB_STATIC_EXPORT === "true";
 const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -30,24 +31,28 @@ const contentSecurityPolicy = [
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost"],
-  output: "standalone",
+  output: staticExport ? "export" : "standalone",
   poweredByHeader: false,
   reactStrictMode: true,
-  async headers() {
-    const values = [
-      { key: "Content-Security-Policy", value: contentSecurityPolicy },
-      { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
-      { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
-      { key: "Permissions-Policy", value: "camera=(), geolocation=(), microphone=()" },
-      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-      { key: "X-Content-Type-Options", value: "nosniff" },
-      { key: "X-Frame-Options", value: "DENY" },
-    ];
-    if (process.env.NODE_ENV === "production") {
-      values.push({ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" });
-    }
-    return [{ source: "/:path*", headers: values }];
-  },
+  ...(staticExport
+    ? {}
+    : {
+        async headers() {
+          const values = [
+            { key: "Content-Security-Policy", value: contentSecurityPolicy },
+            { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+            { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+            { key: "Permissions-Policy", value: "camera=(), geolocation=(), microphone=()" },
+            { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+            { key: "X-Content-Type-Options", value: "nosniff" },
+            { key: "X-Frame-Options", value: "DENY" },
+          ];
+          if (process.env.NODE_ENV === "production") {
+            values.push({ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" });
+          }
+          return [{ source: "/:path*", headers: values }];
+        },
+      }),
 };
 
 export default nextConfig;
