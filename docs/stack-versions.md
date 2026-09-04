@@ -1,6 +1,6 @@
 # LifeHub Stack Versions
 
-Verified: **2 September 2026** against official release pages, npm registry metadata, container registries, provider documentation, and the Go module proxy. Runtime pins and post-update gates reflect the recurrence, Smart Capture, data deletion, production-hardening, and Netlify deployment-adapter slices.
+Dependency versions verified: **2 September 2026** against official release pages, npm registry metadata, container registries, provider documentation, and the Go module proxy. Deployment and UI gate status updated **4 September 2026** without changing the pinned dependency graph.
 
 This file distinguishes the host environment, the compatible versions selected for the first slice, and dependencies intentionally deferred. The root `pnpm-lock.yaml`, `apps/web/package.json`, and `services/api/go.mod` are the installed source of truth.
 
@@ -172,7 +172,7 @@ pnpm test                 # 8 files, 63 tests
 pnpm build                # Next 16.3.3 production build
 ```
 
-After the pnpm 11.25.0 patch update, `pnpm audit --audit-level high` reports no known vulnerabilities and `pnpm audit signatures` verifies all 502 packages. `pnpm outdated --recursive` reports only the three intentional compatibility pins already explained above: TypeScript 6.0.3, ESLint 9.39.5, and Node 24 type definitions 24.13.3. The eight-case Playwright suite passed end-to-end on 2 September 2026 against a fresh migrated PostgreSQL database; its configurable web port prevented an unrelated local project from being interrupted.
+After the pnpm 11.25.0 patch update, `pnpm audit --audit-level high` reports no known vulnerabilities and `pnpm audit signatures` verifies all 502 packages. `pnpm outdated --recursive` reports only the three intentional compatibility pins already explained above: TypeScript 6.0.3, ESLint 9.39.5, and Node 24 type definitions 24.13.3. The suite grew to nine Playwright cases on 4 September 2026, adding a 1920×1080 Today-layout regression; all nine passed against a fresh migrated PostgreSQL database. Its configurable web port allowed an unrelated local project on port 3000 to remain untouched.
 
 The Go module is pinned to Go 1.27.0 with the direct runtime/migration dependencies shown above and `govulncheck` 1.7.0 as a tracked tool. These gates, including the new Netlify entry point, passed after migration 7 against PostgreSQL 18.6 on 2 September 2026:
 
@@ -193,7 +193,7 @@ Production images are pinned to stable `golang:1.27.0-alpine3.24`, `node:24.19.0
 | Google Cloud CLI | 579.0.0 | Authenticated locally as `vivoy51577@gmail.com`; used for read-only project and billing inspection before provisioning. |
 | Google Cloud project | `project-592af0e7-ebee-4483-88e` | Read-only inspection only. LifeHub creates no GCP resource because alerts-only budgets cannot guarantee a global zero charge; existing BagiYuk resources remain untouched. |
 | Render | Hobby workspace, no card | Rejected during provisioning because the dashboard required a credit card before Blueprint creation. No card or service was added. |
-| Netlify | Free plan; CLI 27.4.2 | Selected replacement: 300 credits/month with a hard limit and no auto-recharge; projects pause instead of generating a charge. The official local build packages the static export and stable Go Function successfully. |
+| Netlify | Free plan; CLI 27.4.2 | Public static export plus stable Go Function live at `https://rainbow-cocada-24a2a9.netlify.app`. Root/API health, readiness, production headers, hosted session recovery, and an authenticated task cycle were verified. The account has no payment method or auto-recharge; its 300-credit monthly limit pauses projects instead of generating an overage charge. |
 | Supabase | Free Nano active | LifeHub Auth plus PostgreSQL source of truth in Singapore; ES256 JWKS verified and migrations passed in GitHub Actions run `33546915708`. |
 | GitHub Container Registry | public API image verified | Anonymous manifest retrieval returned HTTP 200; deployment workflows pin commit `1a463e5afc7fa88df30717525d3721b02ccc90c4`. |
 | GitHub Actions | public repository standard runners | Scheduled 45-second worker and manual migrator; free for public repositories and disabled until production verification. |

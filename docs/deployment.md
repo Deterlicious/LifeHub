@@ -1,10 +1,10 @@
 # LifeHub Deployment Guide
 
-Status: **Supabase Free Auth/PostgreSQL is provisioned and migrated; the strict zero-charge Netlify build is locally verified, but no public LifeHub deployment is claimed yet**.
+Status: **Supabase Free Auth/PostgreSQL and the public strict zero-charge Netlify app are verified; the scheduled worker remains deliberately disabled pending a live reminder smoke**.
 
 Current provider capabilities, account usage, and stable runtime versions were rechecked on 2 September 2026. The owner requires a deployment that cannot create a bill. Google Cloud is therefore excluded: its billing account is required even for Free Tier, and its alerts-only budget is not a global hard spending cap. Render was also rejected when it required a credit card before Blueprint creation. Never claim a deployment before its public journeys pass.
 
-## Selected zero-charge topology — pending provisioning
+## Selected zero-charge topology — web/API provisioned
 
 The selected target uses only free plans configured without a payment method:
 
@@ -69,7 +69,7 @@ The Go API and worker share application/store/domain code. The public API entry 
 
 The checked-in paid Blueprint selects Render plans for web/API/worker and PostgreSQL. Those are paid resources. Blueprint creation or sync is prohibited unless the owner later replaces the strict zero-charge policy with explicit cost approval.
 
-On 2 September 2026, Netlify CLI 27.4.2 completed an offline official build: Next 16.3.3 produced `apps/web/out`, and Netlify packaged the Go Function successfully. `render.free.yaml` and `render.yaml` remain schema-valid historical alternatives but are prohibited by the selected cost policy.
+On 2 September 2026, Netlify CLI 27.4.2 completed an offline official build: Next 16.3.3 produced `apps/web/out`, and Netlify packaged the Go Function successfully. On 4 September the same topology was deployed publicly and its hosted browser/API journey passed. `render.free.yaml` and `render.yaml` remain schema-valid historical alternatives but are prohibited by the selected cost policy.
 
 ## Production requirements
 
@@ -166,12 +166,12 @@ Safe hard-free order:
 
 1. [done] create the Supabase Free project, use its asymmetric signing key, and verify the public ES256 JWKS;
 2. [done] add only `LIFEHUB_DATABASE_URL` as a GitHub Actions secret and pass the manual migration workflow;
-3. create/link a Netlify Free account without adding a payment method and grant access only to the public LifeHub repository;
-4. configure the public Supabase build values and the scoped server-only Function values, including the bounded `2/0` pool;
-5. deploy `netlify.toml`, then configure Supabase Site URL/redirect URLs for the final `netlify.app` HTTPS origin;
-6. smoke-test hosted authentication, session recovery, Today, and an authenticated write/read cycle;
+3. [done] create/link a Netlify Free account without adding a payment method and grant access only to the public LifeHub repository;
+4. [done] configure the public Supabase build values and the scoped server-only Function values, including the bounded `2/0` pool;
+5. [done] deploy `netlify.toml`, then configure Supabase Site URL/redirect URLs for the final `netlify.app` HTTPS origin;
+6. [done] smoke-test hosted session recovery, Today/Agenda, and an authenticated task write/read cycle;
 7. set `LIFEHUB_FREE_DEPLOYMENT_ENABLED=true`, run the worker manually once, and verify a scheduled reminder;
-8. verify ingress headers plus account dashboards show Free plans, no payment method, no auto-recharge, and no Google Cloud or Render LifeHub service.
+8. [done] verify ingress headers plus account dashboards show Free plans, no payment method, no auto-recharge, and no Google Cloud or Render LifeHub service.
 
 For breaking schema changes, use expand-and-contract migrations.
 
@@ -201,48 +201,45 @@ On 27 August 2026, both production images built and ran locally:
 - the standalone web container returned HTTP 200 with its production CSP/HSTS headers;
 - the full product journeys had already exercised durable reminder retry/restart idempotency, recurrence, and reviewed Smart Capture against PostgreSQL.
 
-CI repeats both production image builds after the web and Go gates, using non-secret public placeholders for the Supabase/web build boundary. The separate manual publish workflow emits immutable commit tags plus `latest`; its result is not deployment proof. GitHub Actions run `33517311546` passed the web, Go integration/race, container-build, and eight-case E2E jobs for the current zero-charge profile. The manual hosted migration run `33546915708` then migrated Supabase successfully. The hard-free static export and Netlify Go Function subsequently passed the official local Netlify build.
+CI repeats both production image builds after the web and Go gates, using non-secret public placeholders for the Supabase/web build boundary. The separate manual publish workflow emits immutable commit tags plus `latest`; its result alone is not deployment proof. GitHub Actions run `33551926366` passed the web, Go integration/race, container-build, and eight-case E2E jobs for the initial public-deployment commit. The manual hosted migration run `33546915708` migrated Supabase successfully. The hard-free static export and Netlify Go Function then deployed publicly.
 
-This is not public-deployment evidence. The fresh eight-case browser suite, clean-database application/River migration proof, hosted Supabase migration, and local Netlify package build pass. The final release still requires Netlify deployment, hosted Supabase browser journeys, real ingress/header checks, and a live worker delivery smoke.
+On 4 September 2026, `https://rainbow-cocada-24a2a9.netlify.app` returned HTTP 200, `/healthz` and `/readyz` returned healthy/ready, the real ingress retained the expected production headers, private endpoints rejected unauthenticated requests with 401/no-store, and the development-session endpoint was absent. A confirmed Supabase session recovered in the browser, loaded Today and Agenda, and persisted an authenticated task create/complete/uncomplete/reload cycle. The fresh local suite now has nine passing browser cases, including a 1920×1080 Today-layout regression. Live scheduled reminder delivery, explicit hosted sign-out/re-login, backup/restore proof, and monitoring remain open.
 
 ## Production checklist
 
-- [ ] HTTPS
-- [ ] allowed CORS origins
+- [x] HTTPS
+- [x] allowed same-origin CORS behavior
 - [x] Supabase JWT/JWKS provisioned and reachable
-- [ ] no secret in client bundle
-- [ ] DB TLS
+- [x] no server secret configured at the browser build boundary
+- [x] DB TLS through the hosted Supabase connection
 - [ ] backups enabled
 - [ ] restore procedure documented/tested
 - [x] migrations tested against hosted Supabase
-- [ ] API health/readiness
+- [x] API health/readiness at public ingress
 - [ ] worker restart policy
-- [ ] graceful shutdown
-- [ ] log redaction
-- [ ] dependency audit
-- [ ] `govulncheck ./...`
-- [ ] Playwright critical journey
+- [x] graceful shutdown in container/runtime smoke
+- [x] log redaction behavior covered by tests and production error boundary
+- [x] dependency audit
+- [x] `govulncheck ./...`
+- [x] Playwright critical journey locally plus hosted authenticated task smoke
 - [x] LifeHub application-data deletion procedure (typed confirmation, owned cascade, queued reminder cancellation)
 - [ ] Supabase authentication-identity deletion procedure, if required by the production policy
 - [ ] monitoring/alerting proportional to real operational needs
 
 ## Deployment record
 
-Fill this after actual deployment:
-
 ```text
-Web provider:
-Web URL:
-API provider:
-API URL:
-Worker provider:
-PostgreSQL provider:
-Region:
-Deployment date:
-Web commit:
-API commit:
-Migration version:
-Go version:
-Node version:
-Known limitations:
+Web provider: Netlify Free
+Web URL: https://rainbow-cocada-24a2a9.netlify.app
+API provider: Netlify Go Function (same origin)
+API URL: https://rainbow-cocada-24a2a9.netlify.app/api/v1
+Worker provider: GitHub Actions public-repository runner (configured, disabled pending live smoke)
+PostgreSQL provider: Supabase Free
+Region: Singapore (database); Netlify managed edge/function
+Deployment date: 4 September 2026
+Initial verified web/API commit: 6406d88
+Migration version: application 7; River 7
+Go version: 1.27.0
+Node version: 24.19.0 target
+Known limitations: free-quota suspension/cold starts; worker not enabled; reminder delivery, explicit hosted sign-out/re-login, backup/restore, and monitoring remain unverified
 ```

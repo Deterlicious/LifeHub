@@ -77,7 +77,7 @@ function isPaid(item: TodayBillItem): boolean {
 function priorityLabel(priority: Priority): string {
   if (priority === "high") return "Prioritas tinggi";
   if (priority === "low") return "Prioritas rendah";
-  return "Prioritas sedang";
+  return "Prioritas normal";
 }
 
 function eventSchedule(item: TodayEventItem, timezone: string) {
@@ -306,47 +306,82 @@ export function TodayView({
       </header>
 
       <div className="today-grid">
-        <section className="timeline-card" aria-labelledby="timeline-title">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Fokus hari ini</p>
-              <h2 id="timeline-title">Today</h2>
+        <div className="today-primary-column">
+          <section className="timeline-card" aria-labelledby="timeline-title">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Fokus hari ini</p>
+                <h2 id="timeline-title">Today</h2>
+              </div>
+              <div className="summary-copy" aria-label={`${openItems.length} terbuka, ${today.summary.completed} dituntaskan`}>
+                <strong>{openItems.length}</strong> perlu perhatian
+                <span>· {today.summary.completed} tuntas hari ini</span>
+              </div>
             </div>
-            <div className="summary-copy" aria-label={`${openItems.length} terbuka, ${today.summary.completed} dituntaskan`}>
-              <strong>{openItems.length}</strong> perlu perhatian
-              <span>· {today.summary.completed} tuntas hari ini</span>
-            </div>
-          </div>
 
-          {openItems.length > 0 ? (
-            <div className="timeline-list">
-              {openItems.map((item) => (
-                <TodayRow
-                  completing={item.kind === "task" && completingTaskId === item.id}
-                  item={item}
-                  key={`${item.kind}-${item.id}`}
-                  markingPaid={item.kind === "bill" && markingBillId === item.id}
-                  onComplete={onComplete}
-                  onMarkBillPaid={onMarkBillPaid}
-                  onEdit={onEdit}
-                  timezone={timezone}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="empty-state">
-              <span className="empty-icon" aria-hidden="true"><Inbox size={25} /></span>
-              <h3>Hari ini masih lapang.</h3>
-              <p>Tambahkan tugas, jadwal, tagihan, atau metadata dokumen penting—cukup satu hal untuk memulai.</p>
-              <a className="text-button" href="#quick-add">Tambah hal pertama</a>
-            </div>
-          )}
+            {openItems.length > 0 ? (
+              <div className="timeline-list">
+                {openItems.map((item) => (
+                  <TodayRow
+                    completing={item.kind === "task" && completingTaskId === item.id}
+                    item={item}
+                    key={`${item.kind}-${item.id}`}
+                    markingPaid={item.kind === "bill" && markingBillId === item.id}
+                    onComplete={onComplete}
+                    onMarkBillPaid={onMarkBillPaid}
+                    onEdit={onEdit}
+                    timezone={timezone}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <span className="empty-icon" aria-hidden="true"><Inbox size={25} /></span>
+                <h3>Hari ini masih lapang.</h3>
+                <p>Tambahkan tugas, jadwal, tagihan, atau metadata dokumen penting—cukup satu hal untuk memulai.</p>
+                <a className="text-button" href="#quick-add">Tambah hal pertama</a>
+              </div>
+            )}
 
-          {completedItems.length > 0 ? (
-            <details className="completed-section">
-              <summary><ListChecks size={17} aria-hidden="true" /> Tuntas hari ini ({completedItems.length})</summary>
-              <div className="timeline-list timeline-list-completed">
-                {completedItems.map((item) => (
+            {completedItems.length > 0 ? (
+              <details className="completed-section">
+                <summary><ListChecks size={17} aria-hidden="true" /> Tuntas hari ini ({completedItems.length})</summary>
+                <div className="timeline-list timeline-list-completed">
+                  {completedItems.map((item) => (
+                    <TodayRow
+                      completing={false}
+                      item={item}
+                      key={`${item.kind}-${item.id}`}
+                      markingPaid={false}
+                      onComplete={onComplete}
+                      onMarkBillPaid={onMarkBillPaid}
+                      onEdit={onEdit}
+                      timezone={timezone}
+                    />
+                  ))}
+                </div>
+              </details>
+            ) : null}
+
+            <footer className="timeline-footer">
+              <Clock3 size={16} aria-hidden="true" />
+              Diurutkan oleh LifeHub berdasarkan waktu dan urgensi.
+            </footer>
+          </section>
+
+          {today.upcoming.length > 0 ? (
+            <section className="upcoming-documents" aria-labelledby="upcoming-documents-title">
+              <div className="upcoming-documents-heading">
+                <div>
+                  <p className="eyebrow">Siapkan lebih awal</p>
+                  <h2 id="upcoming-documents-title">Berikutnya</h2>
+                </div>
+                <p>
+                  {today.summary.upcoming} hal dalam {today.upcomingHorizonDays || 30} hari ke depan
+                </p>
+              </div>
+              <div className="timeline-list upcoming-documents-list">
+                {today.upcoming.slice(0, 5).map((item) => (
                   <TodayRow
                     completing={false}
                     item={item}
@@ -359,14 +394,12 @@ export function TodayView({
                   />
                 ))}
               </div>
-            </details>
+              <footer className="upcoming-documents-footer">
+                <a className="text-button" href="#agenda">Lihat semua {today.summary.upcoming} di Agenda</a>
+              </footer>
+            </section>
           ) : null}
-
-          <footer className="timeline-footer">
-            <Clock3 size={16} aria-hidden="true" />
-            Diurutkan oleh LifeHub berdasarkan waktu dan urgensi.
-          </footer>
-        </section>
+        </div>
 
         <aside className="quick-add-column" aria-label="Tambah cepat">
           <QuickAddForm
@@ -381,37 +414,6 @@ export function TodayView({
           />
         </aside>
       </div>
-
-      {today.upcoming.length > 0 ? (
-        <section className="upcoming-documents" aria-labelledby="upcoming-documents-title">
-          <div className="upcoming-documents-heading">
-            <div>
-              <p className="eyebrow">Siapkan lebih awal</p>
-              <h2 id="upcoming-documents-title">Berikutnya</h2>
-            </div>
-            <p>
-              {today.summary.upcoming} hal dalam {today.upcomingHorizonDays || 30} hari ke depan
-            </p>
-          </div>
-          <div className="timeline-list upcoming-documents-list">
-            {today.upcoming.slice(0, 5).map((item) => (
-              <TodayRow
-                completing={false}
-                item={item}
-                key={`${item.kind}-${item.id}`}
-                markingPaid={false}
-                onComplete={onComplete}
-                onMarkBillPaid={onMarkBillPaid}
-                onEdit={onEdit}
-                timezone={timezone}
-              />
-            ))}
-          </div>
-          <footer className="upcoming-documents-footer">
-            <a className="text-button" href="#agenda">Lihat semua {today.summary.upcoming} di Agenda</a>
-          </footer>
-        </section>
-      ) : null}
     </div>
   );
 }

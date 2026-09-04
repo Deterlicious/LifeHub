@@ -2,7 +2,7 @@
 
 LifeHub may store private personal planning data. Security is a product requirement.
 
-Status note: task/Today, event, bill, document expiry/management, Agenda & Corrections, durable reminders/notifications, recurrence, and draft-only Smart Capture are implemented and locally verified as recorded. The hosted Supabase ES256 JWKS and database schemas are verified. Browser auth, backup/restore operations, and the public production journey remain outside the verified scope.
+Status note: task/Today, event, bill, document expiry/management, Agenda & Corrections, durable reminders/notifications, recurrence, and draft-only Smart Capture are implemented and locally verified as recorded. The hosted Supabase ES256 JWKS/database schemas and public Netlify deployment are verified. A confirmed hosted session recovered and completed an authenticated task write/read cycle; explicit sign-out/re-login, backup/restore operations, and live scheduled reminder delivery remain outside the verified scope.
 
 ## Threats
 
@@ -167,12 +167,12 @@ The latest scans on 2 September 2026 reported no Go vulnerabilities and no known
 
 ## Current limits
 
-- The Supabase Free project, ES256 JWKS endpoint, and hosted application/River migrations are verified. Hosted browser sign-in, refresh, sign-out, and session recovery have not yet been manually exercised.
+- The Supabase Free project, ES256 JWKS endpoint, and hosted application/River migrations are verified. A confirmed production browser session recovered after reload and completed an authenticated task create/complete/uncomplete/reload cycle. Explicit hosted sign-out/re-login and second-user isolation have not yet been manually exercised.
 - Event list/get/edit/delete, Agenda, bill list/get/edit/delete/mark-unpaid, document metadata CRUD, reminder CRUD, notification read actions, recurrence series/occurrences, and ordinary writes created from reviewed Smart Capture drafts are implemented with server-side ownership enforcement. Document file storage remains explicitly excluded.
 - Authenticated users can permanently delete all of their LifeHub application data through an exact typed confirmation. The transaction cancels their scheduled River reminder jobs before the profile cascade and cannot accept a browser-supplied owner ID. The Supabase authentication identity remains separate and is clearly disclosed in the UI.
 - Development login is for local use only and is not a production identity provider.
 - Non-production API startup requires a loopback listener, and Docker publishes the known-password development database on `127.0.0.1` only.
-- Auth-provider identity deletion, backup retention/restore proof, hosted CSP/HSTS confirmation at the real ingress, and deployment monitoring remain production-readiness work.
+- Auth-provider identity deletion, backup retention/restore proof, live scheduled reminder delivery, and deployment monitoring remain production-readiness work. CSP, HSTS, frame/MIME/referrer/permissions headers, health/readiness, and unauthenticated API rejection were confirmed at the real Netlify ingress on 4 September 2026.
 
 ## Security headers
 
@@ -185,7 +185,7 @@ Implemented and covered by API tests or production-container smoke checks:
 - Cross-Origin-Opener-Policy and Cross-Origin-Resource-Policy on the web;
 - HSTS in production mode.
 
-The final hosted smoke test must confirm the platform does not remove or weaken these headers and that HTTPS is active before release.
+The hosted smoke on 4 September 2026 confirmed HTTPS and the expected CSP, HSTS, frame, MIME, referrer, and permissions headers at the Netlify ingress.
 
 Do not cargo-cult a policy that breaks the app.
 

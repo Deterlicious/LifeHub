@@ -864,6 +864,8 @@ a {
 
 .app-column {
   min-width: 0;
+  container-name: lifehub-app;
+  container-type: inline-size;
 }
 
 .desktop-topbar {
@@ -929,7 +931,7 @@ a {
 
 /* Today */
 .today-page {
-  width: min(100%, 1220px);
+  width: min(100%, 1320px);
   margin: 0 auto;
   padding: 50px clamp(28px, 5vw, 72px) 32px;
 }
@@ -986,8 +988,14 @@ a {
 
 .today-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(310px, 360px);
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 400px);
   align-items: start;
+  gap: 28px;
+}
+
+.today-primary-column {
+  display: grid;
+  min-width: 0;
   gap: 24px;
 }
 
@@ -1407,7 +1415,7 @@ a {
 
 .upcoming-documents {
   overflow: hidden;
-  margin-top: 24px;
+  margin-top: 0;
 }
 
 .upcoming-documents-heading {
@@ -1446,11 +1454,15 @@ a {
 
 .quick-add-column {
   display: grid;
+  min-width: 0;
   gap: 13px;
 }
 
 .quick-add-card {
-  padding: 24px;
+  min-width: 0;
+  padding: 26px;
+  container-name: quick-add-card;
+  container-type: inline-size;
 }
 
 .quick-add-heading {
@@ -1671,8 +1683,18 @@ a {
 
 .quick-add-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(100px, 0.75fr);
-  gap: 11px;
+  grid-template-columns: minmax(0, 1fr) 128px;
+  align-items: start;
+  gap: 12px;
+}
+
+.quick-add-grid > .field,
+.quick-add-grid .input-with-icon,
+.quick-add-grid .select-wrap,
+.quick-add-grid input,
+.quick-add-grid select {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .recurrence-control {
@@ -3038,6 +3060,22 @@ a {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+@container lifehub-app (max-width: 1060px) {
+  .today-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .quick-add-card {
+    padding: 24px 28px;
+  }
+}
+
+@container quick-add-card (max-width: 340px) {
+  .quick-add-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 1060px) {

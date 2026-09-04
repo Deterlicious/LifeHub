@@ -8,7 +8,7 @@ This project is deliberately designed as a real daily-use application rather tha
 
 ## Implemented vertical slices
 
-The repository now contains eight locally verified product journeys:
+The repository now contains eight locally verified product journeys plus a dedicated desktop-layout regression check:
 
 ```text
 development sign-in
@@ -62,7 +62,7 @@ authenticated user
   → save through the normal owned Go API
 ```
 
-The responsive Next.js UI, Go API, restartable Go worker, seven Goose migrations, River schema pinned at version 7, PostgreSQL 18.6 development service, unit/integration tests, and eight mobile/desktop Playwright cases are present. Agenda and all correction APIs are uncapped or explicitly cursor-paginated, ownership-scoped, and tested across ordinary DST changes, midnight gaps, and skipped civil dates. A Supabase Free project is provisioned, its ES256 JWKS is verified, and the application plus River migrations passed against the hosted database. Browser sign-in and the public deployment remain unverified until the final Netlify deployment and hosted journey are exercised.
+The responsive Next.js UI, Go API, restartable Go worker, seven Goose migrations, River schema pinned at version 7, PostgreSQL 18.6 development service, unit/integration tests, and nine mobile/desktop Playwright cases are present. Agenda and all correction APIs are uncapped or explicitly cursor-paginated, ownership-scoped, and tested across ordinary DST changes, midnight gaps, and skipped civil dates. A Supabase Free project is provisioned, its ES256 JWKS is verified, and the application plus River migrations passed against the hosted database. The Netlify production site is live at `https://rainbow-cocada-24a2a9.netlify.app`; hosted session recovery, Today/Agenda loading, and an authenticated task write/read cycle have been manually verified. Explicit hosted sign-out/re-login, backup/restore proof, and the scheduled reminder delivery smoke remain release work.
 
 ## Events → Today
 
@@ -79,7 +79,7 @@ authenticated user
 
 The agreed create contract uses `starts_local`/`ends_local` for timed events and `starts_on`/`ends_on` for all-day events. Timed values are interpreted in the authenticated profile's IANA timezone and stored as instants; all-day values retain date semantics, with `ends_on` inclusive. These are strict alternative input shapes, not interchangeable fields.
 
-Agenda & Corrections subsequently added bounded event list/get/edit/delete and strict schedule replacement without turning LifeHub into a generic event admin page. Recurrence and reminders are implemented through the shared series and durable-job engines. Supabase JWKS and database migrations are hosted and verified; browser-session validation and public deployment remain follow-up work. No additional event-specific dependency was needed.
+Agenda & Corrections subsequently added bounded event list/get/edit/delete and strict schedule replacement without turning LifeHub into a generic event admin page. Recurrence and reminders are implemented through the shared series and durable-job engines. Supabase JWKS, database migrations, public deployment, hosted session recovery, and an authenticated production task cycle are verified. No additional event-specific dependency was needed.
 
 ## Bills → Today
 
@@ -109,7 +109,7 @@ Smart Quick Add is a draft accelerator, not an autonomous writer. Its authentica
 
 ## Product scope
 
-The full LifeHub direction includes the domains below. The task, event, bill, document expiry/management, Agenda & Corrections, durable reminder, recurrence, and draft-only Smart Quick Add journeys described above are implemented and locally verified. Supabase Auth/JWKS and database migrations are provisioned; hosted browser auth and the public Netlify journey are still pending final production gates.
+The full LifeHub direction includes the domains below. The task, event, bill, document expiry/management, Agenda & Corrections, durable reminder, recurrence, and draft-only Smart Quick Add journeys described above are implemented and locally verified. Supabase Auth/JWKS, hosted database migrations, the public Netlify site, hosted session recovery, and an authenticated production task cycle are verified; scheduled reminder delivery and the remaining operational gates are still pending.
 
 ### Today
 One ordered daily feed:
@@ -309,7 +309,7 @@ pnpm test:go:integration
 
 ## Current E2E
 
-The eight Playwright cases cover the four-domain first journey, explicit whole-LifeHub-data deletion, mobile/desktop Agenda corrections, mobile/desktop reminder persistence, mobile recurrence, and mobile Smart Quick Add review-before-save. The command expects PostgreSQL on the documented loopback URL, applies both application and River migrations, and starts/stops fresh API, worker where required, and web processes through Playwright:
+The nine Playwright cases cover the four-domain first journey, explicit whole-LifeHub-data deletion, mobile/desktop Agenda corrections, mobile/desktop reminder persistence, mobile recurrence, mobile Smart Quick Add review-before-save, and a 1920px Today-layout regression for the Upcoming placement plus non-overlapping due-date/priority controls. The command expects PostgreSQL on the documented loopback URL, applies both application and River migrations, and starts/stops fresh API, worker where required, and web processes through Playwright:
 
 ```bash
 pnpm test:e2e
@@ -353,4 +353,4 @@ The settings dialog includes an exact typed-confirmation action to remove every 
 
 ## Status
 
-**Task/Today, event, bill, document expiry/management, Agenda & Corrections, durable reminders/notifications, recurrence, and draft-only Smart Quick Add are implemented and locally verified.** Supabase Free, ES256 JWKS, and the hosted database migrations are verified. Netlify Free is the selected no-card, hard-limit host, and its static-web plus Go Function build passes locally; public deployment and hosted browser auth are not yet claimed. Both Render profiles are retained as unselected references and must not be provisioned while the strict zero-charge policy remains active.
+**Task/Today, event, bill, document expiry/management, Agenda & Corrections, durable reminders/notifications, recurrence, and draft-only Smart Quick Add are implemented and locally verified.** Supabase Free, ES256 JWKS, hosted migrations, and the public Netlify static-web plus Go Function deployment are verified. The production browser recovered an existing Supabase session, loaded Today/Agenda, and persisted an authenticated task create/complete/uncomplete cycle. The scheduled worker remains deliberately disabled until a live reminder smoke is completed. Both Render profiles are retained as unselected references and must not be provisioned while the strict zero-charge policy remains active.

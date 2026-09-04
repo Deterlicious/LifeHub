@@ -1,7 +1,7 @@
 # LifeHub Implementation Plan
 
-Status: **MVP domain slices, durable reminders, recurrence, Smart Quick Add, and local release gates are verified; Supabase is migrated and the public Netlify deployment is pending**
-Last updated: **2 September 2026**
+Status: **MVP domain slices, hosted Supabase persistence, and the public Netlify app are verified; live scheduled reminder delivery and remaining operational gates are pending**
+Last updated: **4 September 2026**
 
 ## Inspected baseline
 
@@ -123,12 +123,12 @@ Exit met for the local development provider on 19 August 2026:
 - the E2E command starts a fresh migrated API/web stack instead of reusing an accidentally stale process;
 - primary navigation exposes only working Today and Add actions; mobile places Today before Quick Add, and the timezone dialog traps/restores focus and closes with Escape.
 
-This phase did not claim hosted sign-in or deployment. Later provisioning created the Supabase Free project, verified its ES256 JWKS, and migrated the hosted database; browser session recovery still requires the final public deployment. The production verifier remains covered by asymmetric JWKS tests for issuer, audience, algorithm, expiry, and subject checks.
+This phase originally did not claim hosted sign-in or deployment. Later provisioning created the Supabase Free project, verified its ES256 JWKS, migrated the hosted database, and deployed the production app. A confirmed hosted session recovered after reload and completed an authenticated task write/read cycle. The production verifier remains covered by asymmetric JWKS tests for issuer, audience, algorithm, expiry, and subject checks.
 
-## Phase 3 — Hosted auth and production validation
+## Phase 3 — Hosted auth and production validation — partially verified
 
-- manually verify Supabase sign-in, refresh, sign-out, and browser session recovery against a real project;
-- deploy the already implemented production JWKS path with real HTTPS issuer/JWKS configuration;
+- manually verify explicit Supabase sign-in and sign-out against a real project; session recovery and authenticated API use are already verified;
+- [done] deploy the implemented production JWKS path with real HTTPS issuer/JWKS configuration;
 - add a second-user browser isolation/sign-out journey against the hosted provider;
 - decide on a stable server-session package only when Supabase no longer documents `@supabase/ssr` as beta, or approve that exception explicitly.
 
@@ -136,7 +136,7 @@ Already automated at the API/store layer:
 - missing, malformed, expired, forged, wrong-algorithm, wrong-issuer, and wrong-audience tokens are rejected;
 - user A cannot read or complete user B's task, and cross-owner completion is indistinguishable from missing data.
 
-Exit: the configured Supabase sign-in/refresh/sign-out flow is manually verified against a real project, and authenticated users reach Today with persisted timezones. Full task edit/delete, recurrence, reminders, and uncomplete remain follow-on task work.
+Current hosted proof: an existing confirmed Supabase session recovered in the production browser, loaded Today and Agenda with its persisted timezone, and completed a task create/complete/uncomplete/reload cycle. Explicit sign-out/re-login and a second-user hosted isolation journey remain before this phase is fully closed.
 
 ## Phase 4 — Events — focused create-to-Today slice complete locally
 
@@ -375,7 +375,7 @@ The installable manifest and application icon are implemented. A service worker 
 - performance;
 - privacy copy.
 
-Completed so far: responsive Today/Agenda/forms at the primary 390×844 and desktop Playwright viewports, keyboard/focus behavior for navigation/dialogs/sheets, reduced-motion CSS, loading/error/empty states, calm privacy copy, production CSP/security headers, and non-root standalone containers. Final manual 360px, 200% zoom, browser accessibility, and production performance checks remain before release.
+Completed so far: responsive Today/Agenda/forms at the primary 390×844 and desktop Playwright viewports, keyboard/focus behavior for navigation/dialogs/sheets, reduced-motion CSS, loading/error/empty states, calm privacy copy, production CSP/security headers, and non-root standalone containers. The 4 September desktop refinement widened the Quick Add rail, made its date/priority grid container-responsive, aligned the normal-priority copy, and placed Upcoming directly below Today instead of below the full-height form. A dedicated 1920×1080 Playwright regression guards the layout. Final manual 360px, 200% zoom, browser accessibility, and production performance checks remain before release.
 
 ## Phase 13 — Production readiness — in progress
 
@@ -397,25 +397,26 @@ Completed locally:
 - non-root API/worker/migrator and standalone web production images build and smoke successfully;
 - a paid Render Singapore Blueprint defines API, worker, web, and private PostgreSQL 18 without embedding secrets;
 - the Blueprint uses current plan identifiers, `checksPass` deployment triggers, and passes Render's current published JSON Schema; the official CLI's workspace-backed validation remains a provisioning check;
-- immutable-action CI passes `actionlint` locally, and GitHub Actions run `33265929162` attempt 2 passed web/Go quality gates, integration race, both production image builds, and the persisted eight-case E2E suite;
+- immutable-action CI passes `actionlint` locally, and GitHub Actions run `33551926366` passed web/Go quality gates, integration race, both production image builds, and the persisted eight-case E2E suite for the initial public deployment;
 - production startup validates HTTPS configuration, ignores development auth, supports platform `PORT`, and emits security headers;
 - `/readyz` verifies PostgreSQL plus exact application/River migration versions;
 - API/worker graceful shutdown and migrator no-op behavior were smoke-tested;
 - Go 1.27.0 unit/HTTP tests, real-PostgreSQL integration tests, Linux/WSL integration race, vet, and `govulncheck` pass;
 - Next 16.3.3 typecheck, lint, all 63 Vitest tests, and production build pass;
-- the complete eight-case Playwright suite passes at 390×844 and 1280×900 against a fresh migrated PostgreSQL database; E2E is capped at two workers to keep the Next dev server and API responsive on small hosts;
+- the complete nine-case Playwright suite passes at 390×844, 1280×900, and the dedicated 1920×1080 Today-layout viewport against a fresh migrated PostgreSQL database; E2E is capped at two workers to keep the Next dev server and API responsive on small hosts;
 - exact-confirmation application-data deletion is implemented through the verified identity, cancels scheduled reminder jobs transactionally, cascades owned PostgreSQL rows, and clearly leaves the separate Supabase identity intact. HTTP/client tests, PostgreSQL integration proof, and the mobile E2E journey all pass.
 - the final lockfile has no known high-severity advisory, all 502 packages have verified registry signatures, the only outdated web packages are three documented compatibility pins, the Go graph resolves no retracted module, and `govulncheck` reports no vulnerability.
 
-Release gates still open on 2 September 2026:
+Release gates still open on 4 September 2026:
 
 - retain the verified public production image for container-capable alternatives; Netlify uses the same Go handler through its stable Go Function adapter;
 - complete manual 360px/200%-zoom/accessibility verification;
 - define and test production backup/restore plus any required Supabase identity-deletion procedure;
-- deploy the already migrated Supabase Free project through a no-card, hard-limit host;
-- after provisioning, verify hosted auth/session recovery, TLS/CORS/headers, worker delivery, monitoring, and the critical production journey.
+- explicitly exercise hosted sign-out/re-login and a second-user isolation journey;
+- verify scheduled worker delivery before enabling its repository variable;
+- complete monitoring, backup/restore proof, and any required Supabase identity-deletion procedure.
 
-## Strict zero-charge deployment track — in progress
+## Strict zero-charge deployment track — public app verified, worker pending
 
 The owner requires a deployment with no path to a charge. Google Cloud Free Tier was rejected because the linked billing account remains open and its IDR 25,000 alerts-only budget is not a global hard cap. Read-only inspection confirmed that no `lifehub-*` Cloud Run service or job exists; existing BagiYuk resources remain untouched.
 
@@ -434,7 +435,7 @@ Supabase Free Auth + PostgreSQL
 
 The existing API image remains public on GHCR and pinned by commit for container-capable hosts. The Next application has an opt-in static export that produced `apps/web/out/index.html`; normal standalone container behavior remains unchanged. Manual migrations and the disabled-by-default bounded worker workflows pass `actionlint`.
 
-The Netlify adapter reuses the existing Go handler and private PostgreSQL boundary, keeps serverless connection pools bounded, and returns a redacted retry response if cold initialization fails. Netlify CLI 27.4.2 successfully built the static Next export and packaged the Go Function locally. Netlify Free has a fixed 300-credit monthly hard limit and no auto-recharge; projects pause at the limit rather than incur a charge. The scheduled worker remains disabled until hosted database and reminder verification pass. The tradeoff is Lambda cold starts, possible scheduling delay, and suspension at free quotas rather than a charge.
+The Netlify adapter reuses the existing Go handler and private PostgreSQL boundary, keeps serverless connection pools bounded, and returns a redacted retry response if cold initialization fails. Netlify Free deployed the static Next export and Go Function at `https://rainbow-cocada-24a2a9.netlify.app`. Root, health, readiness, production headers, unauthenticated rejection, hosted session recovery, Today/Agenda loading, and an authenticated task write/read cycle were verified on 4 September 2026. The Free account has no payment method or auto-recharge; its 300-credit monthly limit pauses projects rather than creating an overage charge. The scheduled worker remains disabled until live reminder verification passes. The tradeoff is Lambda cold starts, possible scheduling delay, and suspension at free quotas rather than a charge.
 
 ## Definition of done
 
